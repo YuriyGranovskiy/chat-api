@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
-from app.models import User, Message, Chat, db
+from app.models import User, Message, Chat, db, DoesNotExistError
 from ulid import ulid
+from app.services import create_message, get_messages
 
 bp = Blueprint('users', __name__)
 
@@ -43,17 +44,19 @@ def create_chat():
 def send_message(chatId):
     data = request.get_json()
     message = data['message']
-
-    new_message = Message(id=str(ulid()), chat_id=chatId, message=message)
-    db.session.add(new_message)
-    db.session.commit()
+    try:
+        create_message(chatId, message)    
+    except DoesNotExistError:
+        return jsonify({'error': 'Chat not found'}), 400
     return jsonify({'message': 'Message sent successfully'}), 200
 
 @bp.route('/chats/<string:chatId>/messages', methods=['GET'])
-def get_messages(chatId):
-    messages = Message.query.filter_by(chat_id=chatId).all()
-    message_list = [{'id': m.id, 'chat_id': m.chat_id, 'message': m.message} for m in messages]
-    return jsonify({'messages': message_list}), 200
+def get_messages_in_chat(chatId):
+    try:
+        messages = get_messages(chatId)
+        return jsonify({'messages': messages}), 200
+    except DoesNotExistError:
+        return jsonify({'error': 'Chat not found'}), 400    
 
 @bp.route('/chats', methods=['GET'])
 def get_chats():

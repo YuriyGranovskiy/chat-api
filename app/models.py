@@ -25,7 +25,5 @@ class Message(db.Model):
     chat_id = db.Column(db.String(28), db.ForeignKey('chat.id'))
     message = db.Column(db.String(1024), nullable=False)
 
-# Example usage:
-# chat = Chat.query.first()
-# messages = chat.messages
-
+class DoesNotExistError(Exception):
+    pass
