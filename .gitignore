@@ -1,0 +1,25 @@
+# Ignore virtual environment
+venv/
+
+# Ignore compiled Python files
+*.pyc
+*.pyo
+
+# Ignore built-in Python modules
+__pycache__/
+
+# Ignore IDE-related files
+.vscode/
+.c9/
+.tmplex/
+
+# Ignore generated files
+node_modules/
+
+# Ignore other irrelevant files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Ignore instance of local db
+instance/
