@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
-from app.models import User, Message  # Note: I added Message to imports
-from app.models import db
-
+from app.models import User, Message, db
+from ulid import ulid
 bp = Blueprint('users', __name__)
 
 @bp.route('/register', methods=['POST'])
@@ -10,11 +9,8 @@ def register():
     username = data['username']
     password = data['password']
 
-    user = User.query.filter_by(username=username).first()
-    if user:
-        return jsonify({'error': 'Username already taken'}), 400
-
-    new_user = User(username=username, password=password)
+    user_id = str(ulid())
+    new_user = User(id=user_id, username=username, password=password)
     db.session.add(new_user)
     db.session.commit()
 
@@ -37,8 +33,8 @@ def send_message():
     data = request.get_json()
     message = data['message']
 
-    user_id = 1  # Replace with actual user ID
-    new_message = Message(user_id=user_id, message=message)
+    user_id = '01JZGW44DYTJ3ZZBFH4B3XE7HN'
+    new_message = Message(id=str(ulid()), user_id=user_id, message=message)
     db.session.add(new_message)
     db.session.commit()
     return jsonify({'message': 'Message sent successfully'}), 200
@@ -48,3 +44,4 @@ def get_messages():
     messages = Message.query.all()
     message_list = [{'id': m.id, 'user_id': m.user_id, 'message': m.message} for m in messages]
     return jsonify({'messages': message_list}), 200
+
