@@ -53,9 +53,11 @@ def send_message(chatId):
 
 @bp.route('/chats/<string:chatId>/messages', methods=['GET'])
 def get_messages_in_chat(chatId):
+    limit = request.args.get('limit', default=10, type=int)
+    lastMessageId = request.args.get('lastMessageId')
+
     try:
-        messages = get_messages(chatId)
-        message_list = [{'id': m.id, 'user_id': Chat.query.get(m.chat_id).user_id, 'message': m.message} for m in messages]
+        message_list = get_messages(chatId, lastMessageId, limit)
         return jsonify({'messages': message_list}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400    
