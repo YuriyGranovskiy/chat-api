@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
-import ulid
+from sqlalchemy import Enum
+import enum
 
 db = SQLAlchemy()
 
@@ -20,10 +21,16 @@ class Chat(db.Model):
     def __repr__(self):
         return f"Chat('{self.user_id}', '{self.name}')"
 
+class SendMessageType(enum.Enum):
+    USER = 1
+    AGENT = 2
+
 class Message(db.Model):
     id = db.Column(db.String(28), primary_key=True)
-    chat_id = db.Column(db.String(28), db.ForeignKey('chat.id'))
+    chat_id = db.Column(db.String(28), db.ForeignKey('chat.id', ondelete='RESTRICT'))
+    sender_type = db.Column(db.Enum(SendMessageType))
     message = db.Column(db.String(1024), nullable=False)
 
 class DoesNotExistError(Exception):
     pass
+
