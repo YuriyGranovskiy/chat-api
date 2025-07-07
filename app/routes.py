@@ -16,7 +16,7 @@ def register():
     db.session.add(new_user)
     db.session.commit()
 
-    return jsonify({'message': 'User created successfully'}), 200
+    return jsonify({'message': 'User created successfully', 'user_id': user_id}), 200
 
 @bp.route('/login', methods=['POST'])
 def login():
@@ -28,7 +28,7 @@ def login():
     if not user or user.password != password:
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    return jsonify({'message': 'User logged in successfully'}), 200
+    return jsonify({'message': 'User logged in successfully', 'user_id': user.id}), 200
 
 @bp.route('/chats', methods=['POST'])
 def create_chat():
@@ -38,23 +38,25 @@ def create_chat():
     new_chat = Chat(id=str(ulid()), user_id=user_id, name=name)
     db.session.add(new_chat)
     db.session.commit()
-    return jsonify({'message': 'Chat created successfully'}), 200
+
+    return jsonify({'message': 'Chat created successfully', 'chat_id': new_chat.id}), 200
 
 @bp.route('/chats/<string:chatId>/messages', methods=['POST'])
 def send_message(chatId):
     data = request.get_json()
     message = data['message']
     try:
-        create_message(chatId, message)    
+        message_id = create_message(chatId, message)    
+        return jsonify({'message': 'Message sent successfully', 'message_id': message_id}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400
-    return jsonify({'message': 'Message sent successfully'}), 200
 
 @bp.route('/chats/<string:chatId>/messages', methods=['GET'])
 def get_messages_in_chat(chatId):
     try:
         messages = get_messages(chatId)
-        return jsonify({'messages': messages}), 200
+        message_list = [{'id': m.id, 'user_id': Chat.query.get(m.chat_id).user_id, 'message': m.message} for m in messages]
+        return jsonify({'messages': message_list}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400    
 
@@ -70,4 +72,7 @@ def get_chat(chatId):
     chat = Chat.query.get(chatId)
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
-    return jsonify({'id': chat.id, 'user_id': chat.user_id, 'name': chat.name}), 200
+
+    messages = Message.query.filter_by(chat_id=chatId).all()
+    message_list = [{'id': m.id, 'user_id': chat.user_id, 'message': m.message} for m in messages]
+    return jsonify({'id': chat.id, 'user_id': chat.user_id, 'name': chat.name, 'messages': message_list}), 200
