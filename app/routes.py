@@ -41,23 +41,23 @@ def create_chat():
 
     return jsonify({'message': 'Chat created successfully', 'chat_id': new_chat.id}), 200
 
-@bp.route('/chats/<string:chatId>/messages', methods=['POST'])
-def send_message(chatId):
+@bp.route('/chats/<string:chat_id>/messages', methods=['POST'])
+def send_message(chat_id):
     data = request.get_json()
     message = data['message']
     try:
-        message_id = create_message(chatId, message)    
+        message_id = create_message(chat_id, message)    
         return jsonify({'message': 'Message sent successfully', 'message_id': message_id}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400
 
-@bp.route('/chats/<string:chatId>/messages', methods=['GET'])
-def get_messages_in_chat(chatId):
+@bp.route('/chats/<string:chat_id>/messages', methods=['GET'])
+def get_messages_in_chat(chat_id):
     limit = request.args.get('limit', default=10, type=int)
-    lastMessageId = request.args.get('lastMessageId')
+    last_message_id = request.args.get('last_message_id')
 
     try:
-        message_list = get_messages(chatId, lastMessageId, limit)
+        message_list = get_messages(chat_id, last_message_id, limit)
         return jsonify({'messages': message_list}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400    
@@ -69,12 +69,12 @@ def get_chats():
     chat_list = [{'id': c.id, 'user_id': c.user_id, 'name': c.name} for c in chats]
     return jsonify({'chats': chat_list}), 200
 
-@bp.route('/chats/<string:chatId>', methods=['GET'])
-def get_chat(chatId):
-    chat = Chat.query.get(chatId)
+@bp.route('/chats/<string:chat_id>', methods=['GET'])
+def get_chat(chat_id):
+    chat = Chat.query.get(chat_id)
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
 
-    messages = Message.query.filter_by(chat_id=chatId).all()
+    messages = Message.query.filter_by(chat_id=chat_id).all()
     message_list = [{'id': m.id, 'user_id': chat.user_id, 'message': m.message} for m in messages]
     return jsonify({'id': chat.id, 'user_id': chat.user_id, 'name': chat.name, 'messages': message_list}), 200
