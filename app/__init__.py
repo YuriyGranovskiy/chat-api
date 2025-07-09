@@ -30,7 +30,6 @@ async def process_messages_job():
     while True:
         with app.app_context():
             process_messages()
-        print(f'Job executed at {datetime.now()}')
         await sleep(1)
 
 if __name__ == 'app':
