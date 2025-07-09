@@ -1,6 +1,11 @@
+from app.logging_config import get_logging_config
 from app.models import Message, Status, db
 import ollama
 from ulid import ulid
+import logging.config
+
+logging_config = logging.config.dictConfig(get_logging_config())
+logger = logging.getLogger(__name__)
 
 def process_messages():
     new_messages = Message.query.filter_by(status=Status.NEW).all()
@@ -12,5 +17,6 @@ def process_messages():
             db.session.add(new_processed_message)
             message.status = Status.PROCESSED
             db.session.commit()
+            logger.info(f'Сообщение {message.id} успешно обработано и добавлено в базу')
         except Exception as e:
-            print(f"Error processing message {message.id}: {str(e)}")
+            logger.error(f'Ошибка при обработке сообщения {message.id}: {str(e)}')
