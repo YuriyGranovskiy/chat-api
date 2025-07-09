@@ -8,10 +8,6 @@ import ollama
 bp = Blueprint('services', __name__)
 
 def create_message(chat_id, message):
-    
-    result = ollama.generate(model='mistral', prompt=message)
-    print(result['response'])    
-
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
