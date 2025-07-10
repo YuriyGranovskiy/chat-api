@@ -11,14 +11,15 @@ class User(db.Model):
     def __repr__(self):
         return f"User('{self.username}')"
 
-class SendMessageType(enum.Enum):
+class MessageType(enum.Enum):
     USER = 1
-    AGENT = 2
+    ASSISTANT = 2
+    SYSTEM = 3
 
 class Status(enum.Enum):
-    NEW = 'new'
-    PROCESSING = 'processing'
-    PROCESSED = 'processed'
+    NEW = 1
+    PROCESSING = 2
+    PROCESSED = 3
 
 class Chat(db.Model):
     id = db.Column(db.String(28), primary_key=True)
@@ -32,7 +33,7 @@ class Chat(db.Model):
 class Message(db.Model):
     id = db.Column(db.String(28), primary_key=True)
     chat_id = db.Column(db.String(28), db.ForeignKey('chat.id', ondelete='RESTRICT'))
-    sender_type = db.Column(db.Enum(SendMessageType))
+    sender_type = db.Column(db.Enum(MessageType))
     message = db.Column(db.String(1024), nullable=False)
     status = db.Column(db.Enum(Status), default=Status.NEW, server_default=Status.NEW.name)
 

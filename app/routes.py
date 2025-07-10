@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import User, Message, Chat, db, DoesNotExistError
+from app.models import User, Message, Chat, db, DoesNotExistError, MessageType
 from ulid import ulid
 from app.services import create_message, get_messages
 
@@ -35,9 +35,12 @@ def create_chat():
     data = request.get_json()
     user_id = data['user_id']
     name = data['name']
+    initial = data['initial']
     new_chat = Chat(id=str(ulid()), user_id=user_id, name=name)
     db.session.add(new_chat)
     db.session.commit()
+
+    create_message(new_chat.id, initial, MessageType.SYSTEM)
 
     return jsonify({'message': 'Chat created successfully', 'chat_id': new_chat.id}), 200
 
@@ -46,7 +49,7 @@ def send_message(chat_id):
     data = request.get_json()
     message = data['message']
     try:
-        message_id = create_message(chat_id, message)    
+        message_id = create_message(chat_id, message, MessageType.USER)    
         return jsonify({'message': 'Message sent successfully', 'message_id': message_id}), 200
     except DoesNotExistError:
         return jsonify({'error': 'Chat not found'}), 400
