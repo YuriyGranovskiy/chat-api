@@ -5,6 +5,7 @@ from ulid import ulid
 import ollama
 import json
 import logging.config
+from transformers import AutoTokenizer
 
 logging_config = logging.config.dictConfig(get_logging_config())
 logger = logging.getLogger(__name__)
@@ -35,6 +36,17 @@ def process_messages():
             db.session.add(new_processed_message)
             message.status = Status.PROCESSED
             db.session.commit()
-            logger.info(f'Сообщение {message.id} успешно обработано и добавлено в базу')
+            logger.info(f'Message {message.id} sccessfully processed and added to the database. Tokens sent {count_tokens(messages)}')
         except Exception as e:
-            logger.error(f'Ошибка при обработке сообщения {message.id}: {str(e)}')
+            logger.error(f'Error processing message {message.id}: {str(e)}')
+
+def count_tokens(messages):
+    tokenizer = AutoTokenizer.from_pretrained("hf-internal-testing/llama-tokenizer")
+    total = 0
+    for m in messages:
+        role = m['role']
+        content = m['content']
+        role_tokens = tokenizer.encode(role, add_special_tokens=False)
+        content_tokens = tokenizer.encode(content, add_special_tokens=False)
+        total += len(role_tokens) + len(content_tokens)
+    return total
