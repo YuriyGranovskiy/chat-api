@@ -1,0 +1,234 @@
+openapi: 3.0.2
+info:
+  title: API for chats and messages
+  description: API for creating, reading, updating and deleting chats and messages
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /register:
+    post:
+      summary: Create a new user
+      description: Creates a new user with the given username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user_id:
+                    type: string
+        400:
+          description: Bad request
+
+  /login:
+    post:
+      summary: Login a user
+      description: Logs in a user with the given username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: User logged in successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user_id:
+                    type: string
+        401:
+          description: Invalid credentials
+
+  /chats:
+    post:
+      summary: Create a new chat
+      description: Creates a new chat with the given name and initial message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                name:
+                  type: string
+                initial:
+                  type: string
+      responses:
+        200:
+          description: Chat created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  chat_id:
+                    type: string
+    get:
+      summary: Get chats of a user
+      description: Gets the chats of the given user with their messages
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Chats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        user_id:
+                          type: string
+                        name:
+                          type: string
+
+  /chats/{chat_id}/messages:
+    post:
+      summary: Send a new message to a chat
+      description: Sends a new message to the given chat with the given content
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+      responses:
+        200:
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  message_id:
+                    type: string
+        400:
+          description: Bad request
+
+    get:
+      summary: Get messages in a chat
+      description: Gets the messages in the given chat with the given limit and last message ID
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: last_message_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        user_id:
+                          type: string
+                        message:
+                          type: string
+
+  /chats/{chat_id}:
+    get:
+      summary: Get a chat
+      description: Gets the given chat with its messages
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Chat retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  user_id:
+                    type: string
+                  name:
+                    type: string
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        user_id:
+                          type: string
+                        message:
+                          type: string
