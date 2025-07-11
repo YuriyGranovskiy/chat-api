@@ -1,10 +1,13 @@
 openapi: 3.0.2
+
 info:
   title: API for chats and messages
   description: API for creating, reading, updating and deleting chats and messages
   version: 1.0.0
+
 servers:
   - url: /api
+
 paths:
   /register:
     post:
@@ -95,6 +98,7 @@ paths:
                     type: string
                   chat_id:
                     type: string
+
     get:
       summary: Get chats of a user
       description: Gets the chats of the given user with their messages
@@ -196,6 +200,8 @@ paths:
                           type: string
                         message:
                           type: string
+                        sender_type:
+                         type: string
 
   /chats/{chat_id}:
     get:

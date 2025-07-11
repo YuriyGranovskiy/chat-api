@@ -24,5 +24,5 @@ def get_messages(chat_id, last_message_id=None, limit=10):
         messages = Message.query.filter_by(chat_id=chat_id).filter(Message.id <= last_message_id).order_by(desc(Message.id)).limit(limit).all()
     else:
         messages = Message.query.filter_by(chat_id=chat_id).order_by(desc(Message.id)).limit(limit).all()
-    message_list = [{'id': m.id, 'message': m.message} for m in messages]
+    message_list = [{'id': m.id, 'message': m.message, 'sender_type': m.sender_type.name.lower()} for m in messages]
     return message_list
