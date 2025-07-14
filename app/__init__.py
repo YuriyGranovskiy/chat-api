@@ -4,13 +4,14 @@ from app.config import Config
 from app.routes import bp
 from app.models import db
 from app.message_job import process_messages
+from app.sockets_mock import register_socket_handlers
 from asyncio import run, sleep, new_event_loop, set_event_loop
 from asyncio import sleep
 from datetime import datetime
 from threading import Thread
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='eventlet')
 config = Config()
 app.config.from_object(config)
 
@@ -32,10 +33,12 @@ async def process_messages_job():
             process_messages()
         await sleep(1)
 
+register_socket_handlers(socketio)
+
 if __name__ == 'app':
     db.init_app(app)
     with app.app_context():
         db.create_all()
     app.register_blueprint(bp, url_prefix='/api')
-    app.run(debug=config.DEBUG)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
     run_background_job()
