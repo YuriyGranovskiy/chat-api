@@ -1,4 +1,5 @@
 import logging
+import os
 from flask import Flask, Blueprint
 from flask_socketio import SocketIO
 from app.config import Config
@@ -27,5 +28,6 @@ with app.app_context():
 app.register_blueprint(bp, url_prefix='/api')
 register_socket_handlers(socketio)
 
-logger.info(f'Starting background task...')
-socketio.start_background_task(target=process_messages_background_task)
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    logger.info('Starting background task in the main worker process...')
+    socketio.start_background_task(target=process_messages_background_task)
