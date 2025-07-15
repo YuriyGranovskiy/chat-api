@@ -7,9 +7,11 @@ from app.routes import bp
 from app.models import db
 from app.message_job import process_messages
 from app.sockets import register_socket_handlers
+from flask_cors import CORS
 
 app = Flask(__name__)
-socketio = SocketIO(app, async_mode='eventlet')
+CORS(app)
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 config = Config()
 app.config.from_object(config)
 logger = logging.getLogger(__name__)
