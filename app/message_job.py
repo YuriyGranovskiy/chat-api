@@ -6,11 +6,12 @@ import ollama
 import json
 import logging.config
 from transformers import AutoTokenizer
+from datetime import datetime
 
 logging_config = logging.config.dictConfig(get_logging_config())
 logger = logging.getLogger(__name__)
 
-def process_messages():
+def process_messages(socketio_app):
     chats_with_new_user_messages = Chat.query.join(Message, Message.chat_id == Chat.id).filter_by(sender_type=MessageType.USER, status=Status.NEW).distinct().all()
 
     for chat in chats_with_new_user_messages:
@@ -36,6 +37,8 @@ def process_messages():
             db.session.add(new_processed_message)
             message.status = Status.PROCESSED
             db.session.commit()
+            socketio_app.emit('new_message', {'id': processed_message_id, 'message': result['message']['content'], 'sender_type': 'assistant'}, room=message.chat.id, include_self=True)
+
             logger.info(f'Message {message.id} sccessfully processed and added to the database. Tokens sent {count_tokens(messages)}')
         except Exception as e:
             logger.error(f'Error processing message {message.id}: {str(e)}')
