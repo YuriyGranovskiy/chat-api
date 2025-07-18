@@ -1,11 +1,44 @@
 # app/services.py
 from flask import Blueprint
-from app.models import Message, Chat, db, DoesNotExistError
+from flask_jwt_extended import create_access_token
+from app.models import Message, Chat, MessageType, User, db, DoesNotExistError
 from sqlalchemy import desc
 from ulid import ulid
 import ollama
 
 bp = Blueprint('services', __name__)
+
+def register_user(username, password):
+    if User.query.filter_by(username=username).first():
+        raise ValueError('User with this username already exists')
+
+    new_user = User(username=username)
+    new_user.set_password(password)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    access_token = create_access_token(identity=new_user.id)
+    return access_token
+
+def login_user(username, password):
+    user = User.query.filter_by(username=username).first()
+
+    if user and user.check_password(password):
+        access_token = create_access_token(identity=user.id)
+        return access_token
+    return None
+
+def create_user_chat(user_id, name, initial_message):
+    new_chat = Chat(user_id=user_id, name=name)
+    db.session.add(new_chat)
+    db.session.commit()
+    create_message(new_chat.id, initial_message, MessageType.SYSTEM)
+    return new_chat.id
+
+def get_user_chats(user_id):
+    chats = Chat.query.filter_by(user_id=user_id).all()
+    return [{'id': c.id, 'user_id': c.user_id, 'name': c.name} for c in chats]
 
 def create_message(chat_id, message, sender_type):
     chat = Chat.query.get(chat_id)

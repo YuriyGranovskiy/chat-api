@@ -1,76 +1,68 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, Message, Chat, db, DoesNotExistError, MessageType
-from ulid import ulid
-from app.services import create_message, get_messages
+from app import services
 
 bp = Blueprint('users', __name__)
 
 @bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
-
-    user_id = str(ulid())
-    new_user = User(id=user_id, username=username, password=password)
-    db.session.add(new_user)
-    db.session.commit()
-
-    return jsonify({'message': 'User created successfully', 'user_id': user_id}), 200
+    try:
+        token = services.register_user(data['username'], data['password'])
+        return jsonify(access_token=token), 201
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 409 
 
 @bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data['username']
-    password = data['password']
-
-    user = User.query.filter_by(username=username).first()
-    if not user or user.password != password:
+    token = services.login_user(data['username'], data['password'])
+    if not token:
         return jsonify({'error': 'Invalid credentials'}), 401
-
-    return jsonify({'message': 'User logged in successfully', 'user_id': user.id}), 200
+    return jsonify(access_token=token), 200
 
 @bp.route('/chats', methods=['POST'])
+@jwt_required()
 def create_chat():
+    current_user_id = get_jwt_identity()
     data = request.get_json()
-    user_id = data['user_id']
-    name = data['name']
-    initial = data['initial']
-    new_chat = Chat(id=str(ulid()), user_id=user_id, name=name)
-    db.session.add(new_chat)
-    db.session.commit()
-
-    create_message(new_chat.id, initial, MessageType.SYSTEM)
-
-    return jsonify({'message': 'Chat created successfully', 'chat_id': new_chat.id}), 200
+    chat_id = services.create_user_chat(
+        user_id=current_user_id,
+        name=data['name'],
+        initial_message=data['initial']
+    )
+    return jsonify({'message': 'Chat created successfully', 'chat_id': chat_id}), 201
 
 @bp.route('/chats/<string:chat_id>/messages', methods=['POST'])
+@jwt_required()
 def send_message(chat_id):
+    # current_user_id = get_jwt_identity() ...
     data = request.get_json()
-    message = data['message']
     try:
-        message_id = create_message(chat_id, message, MessageType.USER)    
+        message_id = services.create_message(chat_id, data['message'], 'USER')
         return jsonify({'message': 'Message sent successfully', 'message_id': message_id}), 200
     except DoesNotExistError:
-        return jsonify({'error': 'Chat not found'}), 400
+        return jsonify({'error': 'Chat not found'}), 404
 
 @bp.route('/chats/<string:chat_id>/messages', methods=['GET'])
+@jwt_required()
 def get_messages_in_chat(chat_id):
+    # И здесь тоже можно добавить проверку прав доступа
     limit = request.args.get('limit', default=10, type=int)
     last_message_id = request.args.get('last_message_id')
-
     try:
-        message_list = get_messages(chat_id, last_message_id, limit)
+        message_list = services.get_messages(chat_id, last_message_id, limit)
         return jsonify({'messages': message_list}), 200
     except DoesNotExistError:
-        return jsonify({'error': 'Chat not found'}), 400    
+        return jsonify({'error': 'Chat not found'}), 404
 
 @bp.route('/chats', methods=['GET'])
+@jwt_required()
 def get_chats():
-    user_id = request.args.get('user_id')
-    chats = Chat.query.filter_by(user_id=user_id).all()
-    chat_list = [{'id': c.id, 'user_id': c.user_id, 'name': c.name} for c in chats]
-    return jsonify({'chats': chat_list}), 200
+    current_user_id = get_jwt_identity()
+    chats_list = services.get_user_chats(current_user_id)
+    return jsonify({'chats': chats_list}), 200
 
 @bp.route('/chats/<string:chat_id>', methods=['GET'])
 def get_chat(chat_id):

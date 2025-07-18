@@ -1,12 +1,18 @@
+from app.extensions import db, bcrypt
 from flask_sqlalchemy import SQLAlchemy
+from ulid import ulid
 import enum
 
-db = SQLAlchemy()
-
 class User(db.Model):
-    id = db.Column(db.String(28), primary_key=True)
+    id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
     username = db.Column(db.String(64), unique=True, nullable=False)
-    password = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf8')
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password_hash, password)
 
     def __repr__(self):
         return f"User('{self.username}')"
@@ -22,7 +28,7 @@ class Status(enum.Enum):
     PROCESSED = 3
 
 class Chat(db.Model):
-    id = db.Column(db.String(28), primary_key=True)
+    id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
     user_id = db.Column(db.String(28), db.ForeignKey('user.id'))
     name = db.Column(db.String(64), nullable=False)
     messages = db.relationship('Message', backref='chat', lazy=True)
