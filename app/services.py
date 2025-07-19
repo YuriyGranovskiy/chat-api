@@ -59,3 +59,7 @@ def get_messages(chat_id, last_message_id=None, limit=10):
         messages = Message.query.filter_by(chat_id=chat_id).order_by(desc(Message.id)).limit(limit).all()
     message_list = [{'id': m.id, 'message': m.message, 'sender_type': m.sender_type.name.lower()} for m in messages]
     return message_list
+
+def is_user_in_chat(user_id, chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=user_id).first()
+    return chat is not None

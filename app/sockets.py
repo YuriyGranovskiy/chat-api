@@ -1,75 +1,91 @@
-from app.models import MessageType
-from app.services import create_message, get_messages
-from flask_socketio import emit, join_room, disconnect, rooms
+import functools
 from flask import request
+from flask_socketio import emit, join_room, disconnect
+from flask_jwt_extended import decode_token, get_jwt_identity
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
-active_chat_info = {} 
+from app.services import create_message, get_messages, is_user_in_chat
+from app.models import MessageType
+
+session = {}
 
 def register_socket_handlers(socketio_app):
+
+    def authenticated_only(f):
+        @functools.wraps(f)
+        def wrapped(*args, **kwargs):
+            if 'user_id' not in session:
+                emit('error', {'message': 'Authentication required. Please connect with a valid token.'})
+                disconnect()
+            else:
+                return f(*args, **kwargs)
+        return wrapped
+
     @socketio_app.on('connect')
-    def handle_connect():
-        print(f"Client connected: {request.sid}")
+    def handle_connect(auth):
+        if not auth or 'token' not in auth:
+            print(f"Client {request.sid} connected without token. Disconnecting.")
+            return False
+
+        token = auth['token']
+        try:
+            decoded_token = decode_token(token)
+            user_id = decoded_token['sub']
+            
+            session['user_id'] = user_id
+            print(f"Client {request.sid} connected and authenticated as user {user_id}")
+            
+        except (ExpiredSignatureError, InvalidTokenError) as e:
+            print(f"Client {request.sid} provided an invalid token: {e}. Disconnecting.")
+            return False
+        except Exception as e:
+            print(f"An unexpected error occurred during connect: {e}")
+            return False
+
 
     @socketio_app.on('disconnect')
     def handle_disconnect():
-        print(f"Client disconnected: {request.sid}")
-
-        for chat_id, info in list(active_chat_info.items()):
-            pass
+        user_id = session.get('user_id', 'Unknown')
+        print(f"Client {request.sid} (User: {user_id}) disconnected")
 
     @socketio_app.on('join_chat')
+    @authenticated_only
     def handle_join_chat(data):
+        user_id = session['user_id']
         chat_id = data.get('chat_id')
+        
         if not chat_id:
-            emit('error', {'message': 'chat_id is required'})
-            return
+            return emit('error', {'message': 'chat_id is required'})
+
+        if not is_user_in_chat(user_id, chat_id):
+            return emit('error', {'message': 'Access denied'})
 
         join_room(chat_id)
-        print(f"Client {request.sid} joined chat room: {chat_id}")
-        
-        if chat_id not in active_chat_info:
-            active_chat_info[chat_id] = {'task': None, 'connections_count': 0}
-        
+        print(f"User {user_id} ({request.sid}) joined chat room: {chat_id}")
         for message in get_messages(chat_id):
             emit('new_message', message, room=chat_id)
-
+        
         emit('status', {'message': f'Successfully joined chat {chat_id}'}) 
 
-    @socketio_app.on('leave_chat')
-    def handle_leave_chat(data):
-        chat_id = data.get('chat_id')
-        if not chat_id:
-            emit('error', {'message': 'chat_id is required'})
-            return
-        
-        if chat_id in active_chat_info:
-            active_chat_info[chat_id]['connections_count'] -= 1
-            if active_chat_info[chat_id]['connections_count'] <= 0:
-                pass # Задача сама остановится
-        
-        emit('status', {'message': f'Left chat {chat_id}'}, room=request.sid)
-
-        print(f"Client {request.sid} explicitly left chat room: {chat_id}")
-
     @socketio_app.on('send_message')
+    @authenticated_only
     def handle_send_message(data):
-        """
-        Обработка входящего сообщения от клиента через WebSocket.
-        Ожидаем data = {'chat_id': '...', 'user_id': '...', 'message': '...'}
-        """
+        user_id = session['user_id']
         chat_id = data.get('chat_id')
         message_content = data.get('message')
 
         if not chat_id or not message_content:
-            emit('error', {'message': 'Invalid message format (requires chat_id, message)'})
-            return
+            return emit('error', {'message': 'Invalid message format'})
 
-        message_id = create_message(chat_id, message_content, sender_type=MessageType.USER)        
+        if not is_user_in_chat(user_id, chat_id):
+            return emit('error', {'message': 'Access denied'})
+
+        message_id = create_message(chat_id, message_content, sender_type=MessageType.USER)
+        
         message_data = {
             'id': str(message_id),
             'sender_type': 'user',
+            'sender_id': user_id,
             'message': message_content
         }
-
-        socketio_app.emit('new_message', message_data, room=chat_id, include_self=True)
-        print(f"User message sent to chat {chat_id}: {message_content}")
+        socketio_app.emit('new_message', message_data, room=chat_id)

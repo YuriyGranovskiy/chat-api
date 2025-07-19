@@ -19,11 +19,11 @@ def process_messages(socketio_app):
         messages = []
         for message in new_messages:
             if message.sender_type == MessageType.SYSTEM:
-                role = 'system'
+                role = "system"
             elif message.sender_type == MessageType.ASSISTANT:
-                role = 'assistant'
+                role = "assistant"
             else:
-                role = 'user'
+                role = "user"
 
             messages.append({
                 "role": role,
@@ -31,24 +31,25 @@ def process_messages(socketio_app):
             })
 
         try:
-            result = ollama.chat(model="mistral", messages=messages)
+            logger.info(messages)
+            result = ollama.chat(model="llama3.2", messages=messages)
             processed_message_id = str(ulid())
-            new_processed_message = Message(id=processed_message_id, chat_id=message.chat_id, sender_type='ASSISTANT', message=result['message']['content'], status=Status.PROCESSED)
+            new_processed_message = Message(id=processed_message_id, chat_id=message.chat_id, sender_type="ASSISTANT", message=result["message"]["content"], status=Status.PROCESSED)
             db.session.add(new_processed_message)
             message.status = Status.PROCESSED
             db.session.commit()
-            socketio_app.emit('new_message', {'id': processed_message_id, 'message': result['message']['content'], 'sender_type': 'assistant'}, room=message.chat.id, include_self=True)
+            socketio_app.emit("new_message", {"id": processed_message_id, "message": result["message"]["content"], "sender_type": "assistant"}, room=message.chat.id, include_self=True)
 
-            logger.info(f'Message {message.id} sccessfully processed and added to the database. Tokens sent {count_tokens(messages)}')
+            logger.info(f"Message {message.id} sccessfully processed and added to the database. Tokens sent {count_tokens(messages)}")
         except Exception as e:
-            logger.error(f'Error processing message {message.id}: {str(e)}')
+            logger.error(f"Error processing message {message.id}: {str(e)}")
 
 def count_tokens(messages):
     tokenizer = AutoTokenizer.from_pretrained("hf-internal-testing/llama-tokenizer")
     total = 0
     for m in messages:
-        role = m['role']
-        content = m['content']
+        role = m["role"]
+        content = m["content"]
         role_tokens = tokenizer.encode(role, add_special_tokens=False)
         content_tokens = tokenizer.encode(content, add_special_tokens=False)
         total += len(role_tokens) + len(content_tokens)
