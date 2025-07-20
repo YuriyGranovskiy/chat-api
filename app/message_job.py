@@ -32,7 +32,11 @@ def process_messages(socketio_app):
 
         try:
             logger.info(messages)
-            result = ollama.chat(model="llama3.2", messages=messages)
+            result = ollama.chat(model="mistral", messages=messages,
+                                 options={"cache": False,
+                                        "temperature": 0.8,
+                                        "top_p": 0.95,
+                                        "repeat_penalty": 1.1})
             processed_message_id = str(ulid())
             new_processed_message = Message(id=processed_message_id, chat_id=message.chat_id, sender_type="ASSISTANT", message=result["message"]["content"], status=Status.PROCESSED)
             db.session.add(new_processed_message)

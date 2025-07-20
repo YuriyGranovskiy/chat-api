@@ -1,10 +1,8 @@
-# app/services.py
 from flask import Blueprint
 from flask_jwt_extended import create_access_token
 from app.models import Message, Chat, MessageType, User, db, DoesNotExistError
 from sqlalchemy import desc
 from ulid import ulid
-import ollama
 
 bp = Blueprint('services', __name__)
 
@@ -63,3 +61,17 @@ def get_messages(chat_id, last_message_id=None, limit=10):
 def is_user_in_chat(user_id, chat_id):
     chat = Chat.query.filter_by(id=chat_id, user_id=user_id).first()
     return chat is not None
+
+def delete_chat(chat_id):
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        raise DoesNotExistError
+
+    messages = Message.query.filter_by(chat_id=chat_id).all()
+    for message in messages:
+        db.session.delete(message)
+
+    db.session.delete(chat)
+    db.session.commit()
+
+    return None

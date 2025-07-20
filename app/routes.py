@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Message, Chat, db, DoesNotExistError, MessageType
+from app.models import Message, Chat, db, DoesNotExistError
 from app import services
 
 bp = Blueprint('users', __name__)
@@ -48,7 +48,6 @@ def send_message(chat_id):
 @bp.route('/chats/<string:chat_id>/messages', methods=['GET'])
 @jwt_required()
 def get_messages_in_chat(chat_id):
-    # И здесь тоже можно добавить проверку прав доступа
     limit = request.args.get('limit', default=10, type=int)
     last_message_id = request.args.get('last_message_id')
     try:
@@ -65,6 +64,7 @@ def get_chats():
     return jsonify({'chats': chats_list}), 200
 
 @bp.route('/chats/<string:chat_id>', methods=['GET'])
+@jwt_required()
 def get_chat(chat_id):
     chat = Chat.query.get(chat_id)
     if not chat:
@@ -73,3 +73,20 @@ def get_chat(chat_id):
     messages = Message.query.filter_by(chat_id=chat_id).all()
     message_list = [{'id': m.id, 'user_id': chat.user_id, 'message': m.message} for m in messages]
     return jsonify({'id': chat.id, 'user_id': chat.user_id, 'name': chat.name, 'messages': message_list}), 200
+
+@bp.route('/chats/<string:chat_id>', methods=['DELETE'])
+@jwt_required()
+def delete_chat(chat_id):
+    current_user_id = get_jwt_identity()
+    if not chat_id:
+        return jsonify({'message': 'Chat ID is required'}), 400
+
+    if not services.is_user_in_chat(current_user_id, chat_id):
+        return jsonify({'message': 'User is not in the specified chat'}), 403
+
+    try:
+        services.delete_chat(chat_id)
+        return jsonify({'message': 'Chat deleted successfully'}), 200
+    except DoesNotExistError as e:
+        return jsonify({'message': str(e)}), 404
+        
