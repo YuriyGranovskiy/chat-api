@@ -4,7 +4,7 @@ from flask_socketio import emit, join_room, disconnect
 from flask_jwt_extended import decode_token, get_jwt_identity
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
-from app.services import create_message, get_messages, is_user_in_chat, delete_message
+from app.services import create_message, get_messages, is_user_in_chat, delete_message, regenerate_message
 from app.models import MessageType, Message, DoesNotExistError
 
 session = {}
@@ -108,3 +108,24 @@ def register_socket_handlers(socketio_app):
             emit('message_deleted', {'message_id': message_id}, room=chat_id)
         except DoesNotExistError:
             emit('error', {'message': 'Message not found'})
+
+    @socketio_app.on('regenerate_message')
+    @authenticated_only
+    def handle_regenerate_message(data):
+        user_id = session['user_id']
+        message_id = data.get('message_id')
+        if not message_id:
+            return emit('error', {'message': 'message_id is required'})
+        message = Message.query.get(message_id)
+        if not message or message.sender_type != MessageType.ASSISTANT:
+            return emit('error', {'message': 'Message not found or not assistant type'})
+        chat_id = message.chat_id
+        if not is_user_in_chat(user_id, chat_id):
+            return emit('error', {'message': 'Access denied'})
+        try:
+            deleted_ids, user_msg_id = regenerate_message(message_id)
+            for mid in deleted_ids:
+                emit('message_deleted', {'message_id': mid}, room=chat_id)
+            emit('status_updated', {'message_id': user_msg_id, 'status': 'new'}, room=chat_id)
+        except DoesNotExistError:
+            emit('error', {'message': 'Regeneration failed'})

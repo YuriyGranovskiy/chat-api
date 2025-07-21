@@ -1,6 +1,6 @@
 from flask import Blueprint
 from flask_jwt_extended import create_access_token
-from app.models import Message, Chat, MessageType, User, db, DoesNotExistError
+from app.models import Message, Chat, MessageType, Status, User, db, DoesNotExistError
 from sqlalchemy import desc
 from ulid import ulid
 
@@ -83,3 +83,32 @@ def delete_message(message_id):
     db.session.delete(message)
     db.session.commit()
     return None
+
+def regenerate_message(message_id):
+    message = Message.query.get(message_id)
+    if not message or message.sender_type != MessageType.ASSISTANT:
+        raise DoesNotExistError
+    chat_id = message.chat_id
+    # Получаем все сообщения в чате по id (по возрастанию)
+    messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.id).all()
+    # Найти индекс текущего сообщения
+    idx = next((i for i, m in enumerate(messages) if m.id == message_id), None)
+    if idx is None:
+        raise DoesNotExistError
+    # Найти предыдущее user-сообщение
+    prev_user_msg = None
+    for m in reversed(messages[:idx]):
+        if m.sender_type == MessageType.USER:
+            prev_user_msg = m
+            break
+    if not prev_user_msg:
+        raise DoesNotExistError
+    # Собрать id всех сообщений, которые будут удалены (от текущего и далее)
+    to_delete = [m for m in messages[idx:]]
+    deleted_ids = [m.id for m in to_delete]
+    for m in to_delete:
+        db.session.delete(m)
+    # Обновить статус предыдущего user-сообщения
+    prev_user_msg.status = Status.NEW
+    db.session.commit()
+    return deleted_ids, prev_user_msg.id
