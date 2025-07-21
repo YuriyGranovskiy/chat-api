@@ -75,3 +75,11 @@ def delete_chat(chat_id):
     db.session.commit()
 
     return None
+
+def delete_message(message_id):
+    message = Message.query.get(message_id)
+    if not message:
+        raise DoesNotExistError
+    db.session.delete(message)
+    db.session.commit()
+    return None
