@@ -4,7 +4,7 @@ from flask_socketio import emit, join_room, disconnect
 from flask_jwt_extended import decode_token, get_jwt_identity
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
-from app.services import create_message, get_messages, is_user_in_chat, delete_message, regenerate_message
+from app.services import create_message, get_messages, is_user_in_chat, delete_message, regenerate_message, edit_message
 from app.models import MessageType, Message, DoesNotExistError
 
 session = {}
@@ -129,3 +129,23 @@ def register_socket_handlers(socketio_app):
             emit('status_updated', {'message_id': user_msg_id, 'status': 'new'}, room=chat_id)
         except DoesNotExistError:
             emit('error', {'message': 'Regeneration failed'})
+
+    @socketio_app.on('edit_message')
+    @authenticated_only
+    def handle_edit_message(data):
+        user_id = session['user_id']
+        message_id = data.get('message_id')
+        new_text = data.get('message')
+        if not message_id or new_text is None:
+            return emit('error', {'message': 'message_id and message are required'})
+        message = Message.query.get(message_id)
+        if not message:
+            return emit('error', {'message': 'Message not found'})
+        chat_id = message.chat_id
+        if not is_user_in_chat(user_id, chat_id):
+            return emit('error', {'message': 'Access denied'})
+        try:
+            edit_message(message_id, new_text)
+            emit('message_edited', {'message_id': message_id, 'message': new_text}, room=chat_id)
+        except DoesNotExistError:
+            emit('error', {'message': 'Edit failed'})

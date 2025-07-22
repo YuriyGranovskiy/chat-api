@@ -112,3 +112,11 @@ def regenerate_message(message_id):
     prev_user_msg.status = Status.NEW
     db.session.commit()
     return deleted_ids, prev_user_msg.id
+
+def edit_message(message_id, new_text):
+    message = Message.query.get(message_id)
+    if not message:
+        raise DoesNotExistError
+    message.message = new_text
+    db.session.commit()
+    return message.id
