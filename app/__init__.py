@@ -10,6 +10,11 @@ from app.extensions import db, bcrypt, jwt
 from app.message_job import process_messages
 from app.sockets import register_socket_handlers
 
+import os
+
+log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'log')
+os.makedirs(log_dir, exist_ok=True)
+
 logger = logging.getLogger(__name__)
 
 def create_app():

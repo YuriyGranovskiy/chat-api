@@ -11,6 +11,20 @@ from datetime import datetime
 logging_config = logging.config.dictConfig(get_logging_config())
 logger = logging.getLogger(__name__)
 
+custom_template = """
+<|system|>
+{{ .System }}
+
+<|conversation|>
+{{- range .Messages }}
+{{ if eq .Role "user" -}}[User]: {{ .Content }}
+{{ else if eq .Role "assistant" -}}[Assistant]: {{ .Content }}
+{{ else -}}[System]: {{ .Content }}
+{{ end }}
+{{ end }}
+<|assistant|>
+"""
+
 def process_messages(socketio_app):
     chats_with_new_user_messages = Chat.query.join(Message, Message.chat_id == Chat.id).filter_by(sender_type=MessageType.USER, status=Status.NEW).distinct().all()
 
@@ -36,7 +50,9 @@ def process_messages(socketio_app):
                                  options={"cache": False,
                                         "temperature": 0.8,
                                         "top_p": 0.95,
-                                        "repeat_penalty": 1.1})
+                                        "repeat_penalty": 1.1,
+                                        "template": custom_template
+                                        })
             processed_message_id = str(ulid())
             new_processed_message = Message(id=processed_message_id, chat_id=message.chat_id, sender_type="ASSISTANT", message=result["message"]["content"], status=Status.PROCESSED)
             db.session.add(new_processed_message)
