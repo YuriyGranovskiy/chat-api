@@ -41,12 +41,12 @@ The system will implement message compacting logic to ensure token usage stays w
 
 ```python
 def process_messages(socketio_app):
-    chats = Chat.query.filter_by(...).all()
+    chats_with_new_user_messages = Chat.query.join(Message, Message.chat_id == Chat.id).filter_by(sender_type=MessageType.USER, status=Status.NEW).distinct().all()
 
-    for chat in chats:
-        messages = get_new_messages(chat.id)
+    for chat in chats_with_new_user_messages:
+        new_messages = Message.query.filter_by(chat_id=chat.id).order_by(asc(Message.id)).all()
         
-        if should_compact(messages):
+        if should_compact(new_messages):
             compact_conversation(chat.id, socketio_app)
 
         # Process new message with Ollama
