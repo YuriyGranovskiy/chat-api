@@ -31,6 +31,9 @@ class Chat(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
     user_id = db.Column(db.String(28), db.ForeignKey('user.id'))
     name = db.Column(db.String(64), nullable=False)
+    person_name = db.Column(db.Text, nullable=False)
+    person_description = db.Column(db.Text, nullable=True)
+    scenario = db.Column(db.Text, nullable=True)
     messages = db.relationship('Message', backref='chat', lazy=True)
 
     def __repr__(self):

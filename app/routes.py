@@ -30,6 +30,9 @@ def create_chat():
     chat_id = services.create_user_chat(
         user_id=current_user_id,
         name=data['name'],
+        person_name=data['person_name'],
+        person_description=data['person_description'],
+        scenario=data['scenario'],
         initial_message=data['initial']
     )
     return jsonify({'message': 'Chat created successfully', 'chat_id': chat_id}), 201

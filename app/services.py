@@ -27,11 +27,11 @@ def login_user(username, password):
         return access_token
     return None
 
-def create_user_chat(user_id, name, initial_message):
-    new_chat = Chat(user_id=user_id, name=name)
+def create_user_chat(user_id, name, person_name, person_description, scenario, initial_message):
+    new_chat = Chat(user_id=user_id, person_name=person_name, person_description=person_description, scenario=scenario, name=name)
     db.session.add(new_chat)
     db.session.commit()
-    create_message(new_chat.id, initial_message, MessageType.SYSTEM)
+    create_message(new_chat.id, initial_message, MessageType.ASSISTANT)
     return new_chat.id
 
 def get_user_chats(user_id):

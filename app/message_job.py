@@ -11,48 +11,52 @@ from datetime import datetime
 logging_config = logging.config.dictConfig(get_logging_config())
 logger = logging.getLogger(__name__)
 
-custom_template = """
-<|system|>
-{{ .System }}
-
-<|conversation|>
-{{- range .Messages }}
-{{ if eq .Role "user" -}}[User]: {{ .Content }}
-{{ else if eq .Role "assistant" -}}[Assistant]: {{ .Content }}
-{{ else -}}[System]: {{ .Content }}
-{{ end }}
-{{ end }}
-<|assistant|>
-"""
+rules = (
+    "1. Respond with TWO SHORT paragraphs ONLY.\n"
+    "2. Each paragraph must be exactly 2-3 sentences long.\n"
+    "3. Be extremely concise. Avoid purple prose and long metaphors.\n"
+    "4. Use 'Actions' and \"Speech\" format.\n"
+    "5. Stop immediately after the second paragraph."
+)
 
 def process_messages(socketio_app):
     chats_with_new_user_messages = Chat.query.join(Message, Message.chat_id == Chat.id).filter_by(sender_type=MessageType.USER, status=Status.NEW).distinct().all()
 
     for chat in chats_with_new_user_messages:
         new_messages = Message.query.filter_by(chat_id=chat.id).order_by(asc(Message.id)).all()
-        messages = []
+        persona = chat.person_description or "A mysterious stranger."
+        scenario = chat.scenario or "In a quiet room."
+
+        system_content = (
+            f"### YOUR NAME:\n{chat.person_name}\n\n"
+            f"### YOUR ROLE:\n{persona}\n\n"
+            f"### CURRENT SCENARIO:\n{scenario}\n\n"
+            f"### MANDATORY RESPONSE FORMATTING RULES:\n{rules}"
+        )
+        
+        messages = [{"role": "system", "content": system_content}]
+
         for message in new_messages:
             if message.sender_type == MessageType.SYSTEM:
-                role = "system"
-            elif message.sender_type == MessageType.ASSISTANT:
-                role = "assistant"
-            else:
-                role = "user"
+                continue 
+    
+            role = "assistant" if message.sender_type == MessageType.ASSISTANT else "user"
+            messages.append({"role": role, "content": message.message})            
 
-            messages.append({
-                "role": role,
-                "content": message.message
-            })
-
+        if messages[-1]["role"] == "user":
+                        messages[-1]["content"] += "\n\n(Remember: 2 short paragraphs, 2-3 short sentences each, *actions* and \"speech\")"
         try:
             logger.info(messages)
-            result = ollama.chat(model="mistral", messages=messages,
-                                 options={"cache": False,
-                                        "temperature": 0.8,
-                                        "top_p": 0.95,
-                                        "repeat_penalty": 1.1,
-                                        "template": custom_template
-                                        })
+            result = ollama.chat(
+                model="ministral-3:8b", 
+                messages=messages,
+                options={
+                    "temperature": 0.85,
+                    "top_p": 0.9,
+                    "num_ctx": 65536,
+                    "repeat_penalty": 1.2
+                }
+            )
             processed_message_id = str(ulid())
             new_processed_message = Message(id=processed_message_id, chat_id=message.chat_id, sender_type="ASSISTANT", message=result["message"]["content"], status=Status.PROCESSED)
             db.session.add(new_processed_message)
