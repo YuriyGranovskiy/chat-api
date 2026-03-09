@@ -2,8 +2,10 @@ import logging
 import os
 
 from flask import Flask, current_app
+from flask_openapi3 import OpenAPI, Info
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from flask import jsonify
 
 from app.config import Config
 from app.extensions import db, bcrypt, jwt
@@ -25,7 +27,8 @@ def create_app():
                 process_messages(socketio)
             socketio.sleep(1)
 
-    app = Flask(__name__)
+    info = Info(title="Chat API", version="1.0.0")
+    app = OpenAPI(__name__, info=info)
     CORS(app)
     socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
     config = Config()
@@ -37,7 +40,7 @@ def create_app():
     
     # Регистрация Blueprint и создание таблиц
     from app.routes import bp as api_blueprint
-    app.register_blueprint(api_blueprint, url_prefix='/api')
+    app.register_api(api_blueprint, url_prefix='/api')
     register_socket_handlers(socketio)
 
     with app.app_context():

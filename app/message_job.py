@@ -15,8 +15,10 @@ rules = (
     "1. Respond with TWO SHORT paragraphs ONLY.\n"
     "2. Each paragraph must be exactly 2-3 sentences long.\n"
     "3. Be extremely concise. Avoid purple prose and long metaphors.\n"
-    "4. Use 'Actions' and \"Speech\" format.\n"
-    "5. Stop immediately after the second paragraph."
+    "4. Format actions in asterisks and speech in quotes.\n"
+    "5. After the second paragraph writ the name of the location and the characters in JSON format strictly: {\"location\": <location name>, \"persons\": [ List of person's names in current location ]}."
+    "6. When the user speaks to a specific NPC, respond as them.\n"
+    "7. Prefix NPC speech with their name, e.g., AKIRA: \"...\"\n\n"
 )
 
 def process_messages(socketio_app):
@@ -24,13 +26,21 @@ def process_messages(socketio_app):
 
     for chat in chats_with_new_user_messages:
         new_messages = Message.query.filter_by(chat_id=chat.id).order_by(asc(Message.id)).all()
-        persona = chat.person_description or "A mysterious stranger."
+        persona = (
+            "\n".join(
+                f"{p.name}: {p.description or 'No description'}"
+                for p in chat.personas
+            )
+            or "A mysterious stranger."
+        )
         scenario = chat.scenario or "In a quiet room."
 
         system_content = (
-            f"### YOUR NAME:\n{chat.person_name}\n\n"
-            f"### YOUR ROLE:\n{persona}\n\n"
+            f"### RPG ENGINE MODE\n"
+            f"You are the Game Master and the narrator. You control the environment and all NPCs.\n\n"
             f"### CURRENT SCENARIO:\n{scenario}\n\n"
+            f"### Person 1: \n\n"
+            f"### MAIN LOCATIONS:\n-"
             f"### MANDATORY RESPONSE FORMATTING RULES:\n{rules}"
         )
         
@@ -43,8 +53,6 @@ def process_messages(socketio_app):
             role = "assistant" if message.sender_type == MessageType.ASSISTANT else "user"
             messages.append({"role": role, "content": message.message})            
 
-        if messages[-1]["role"] == "user":
-                        messages[-1]["content"] += "\n\n(Remember: 2 short paragraphs, 2-3 short sentences each, *actions* and \"speech\")"
         try:
             logger.info(messages)
             result = ollama.chat(

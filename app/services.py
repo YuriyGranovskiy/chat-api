@@ -1,6 +1,6 @@
 from flask import Blueprint
 from flask_jwt_extended import create_access_token
-from app.models import Message, Chat, MessageType, Status, User, db, DoesNotExistError
+from app.models import Message, Chat, MessageType, Persona, Status, User, db, DoesNotExistError
 from sqlalchemy import desc
 from ulid import ulid
 
@@ -26,13 +26,6 @@ def login_user(username, password):
         access_token = create_access_token(identity=user.id)
         return access_token
     return None
-
-def create_user_chat(user_id, name, person_name, person_description, scenario, initial_message):
-    new_chat = Chat(user_id=user_id, person_name=person_name, person_description=person_description, scenario=scenario, name=name)
-    db.session.add(new_chat)
-    db.session.commit()
-    create_message(new_chat.id, initial_message, MessageType.ASSISTANT)
-    return new_chat.id
 
 def get_user_chats(user_id):
     chats = Chat.query.filter_by(user_id=user_id).all()
@@ -120,3 +113,70 @@ def edit_message(message_id, new_text):
     message.message = new_text
     db.session.commit()
     return message.id
+
+def create_entity(model, **kwargs):
+    """Универсальный создатель сущностей (World, Location, Persona, Profile)"""
+    entity = model(**kwargs)
+    db.session.add(entity)
+    db.session.commit()
+    return entity
+
+def update_entity(model, entity_id, **kwargs):
+    """Универсальный редактор"""
+    entity = model.query.get(entity_id)
+    if not entity:
+        raise DoesNotExistError
+    for key, value in kwargs.items():
+        if hasattr(entity, key):
+            setattr(entity, key, value)
+    db.session.commit()
+    return entity
+
+def get_entities(model):
+    """Универсальный геттер"""
+    entities = model.query.all()
+    return entities
+
+
+def delete_entity(model, entity_id):
+    """Универсальное удаление сущности"""
+    entity = model.query.get(entity_id)
+    if not entity:
+        raise DoesNotExistError
+    db.session.delete(entity)
+    db.session.commit()
+    return None
+
+# Обновленная функция создания чата
+def create_user_chat(user_id, name, world_id=None, profile_id=None, persona_ids=None, location_ids=None):
+    from app.models import Persona, Location # локальный импорт во избежание циклов
+    
+    new_chat = Chat(
+        user_id=user_id, 
+        name=name, 
+        world_id=world_id, 
+        profile_id=profile_id
+    )
+    
+    # Привязываем персонажей (Many-to-Many)
+    if persona_ids:
+        personas = Persona.query.filter(Persona.id.in_(persona_ids)).all()
+        new_chat.personas.extend(personas)
+        
+    # Привязываем доступные локации (Many-to-Many)
+    if location_ids:
+        locations = Location.query.filter(Location.id.in_(location_ids)).all()
+        new_chat.available_locations.extend(locations)
+
+    db.session.add(new_chat)
+    db.session.commit()
+    return new_chat.id
+
+def add_persona_to_chat(chat_id, persona_id):
+    chat = Chat.query.get(chat_id)
+    persona = Persona.query.get(persona_id)
+    if not chat or not persona:
+        raise DoesNotExistError
+    if persona not in chat.personas:
+        chat.personas.append(persona)
+        db.session.commit()
