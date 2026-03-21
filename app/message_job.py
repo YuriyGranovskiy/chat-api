@@ -26,12 +26,19 @@ def process_messages(socketio_app):
 
     for chat in chats_with_new_user_messages:
         new_messages = Message.query.filter_by(chat_id=chat.id).order_by(asc(Message.id)).all()
-        persona = (
+        personas_block = (
             "\n".join(
                 f"{p.name}: {p.description or 'No description'}"
                 for p in chat.personas
             )
-            or "A mysterious stranger."
+            or "No personas in this chat."
+        )
+        locations_block = (
+            "\n".join(
+                f"{l.name}: {l.description or 'No description'}"
+                for l in chat.available_locations
+            )
+            or "No locations in this chat."
         )
         scenario = chat.scenario or "In a quiet room."
 
@@ -39,8 +46,8 @@ def process_messages(socketio_app):
             f"### RPG ENGINE MODE\n"
             f"You are the Game Master and the narrator. You control the environment and all NPCs.\n\n"
             f"### CURRENT SCENARIO:\n{scenario}\n\n"
-            f"### Person 1: \n\n"
-            f"### MAIN LOCATIONS:\n-"
+            f"### CHAT PERSONAS (name: description):\n{personas_block}\n\n"
+            f"### CHAT LOCATIONS (name: description):\n{locations_block}\n\n"
             f"### MANDATORY RESPONSE FORMATTING RULES:\n{rules}"
         )
         
