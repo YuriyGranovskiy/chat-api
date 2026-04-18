@@ -1,112 +1,140 @@
-from flask import Blueprint
+from __future__ import annotations
+
+from typing import Any, TypeVar
+
 from flask_jwt_extended import create_access_token
-from app.models import Message, Chat, MessageType, Persona, Status, User, db, DoesNotExistError
 from sqlalchemy import desc
 from ulid import ulid
 
-bp = Blueprint('services', __name__)
+from app.models import (
+    Chat,
+    DoesNotExistError,
+    Location,
+    Message,
+    MessageType,
+    Persona,
+    Status,
+    User,
+    db,
+)
 
-def register_user(username, password):
+ModelT = TypeVar("ModelT")
+
+
+def register_user(username: str, password: str) -> str:
     if User.query.filter_by(username=username).first():
-        raise ValueError('User with this username already exists')
+        raise ValueError("User with this username already exists")
 
     new_user = User(username=username)
     new_user.set_password(password)
-
     db.session.add(new_user)
     db.session.commit()
+    return create_access_token(identity=new_user.id)
 
-    access_token = create_access_token(identity=new_user.id)
-    return access_token
 
-def login_user(username, password):
+def login_user(username: str, password: str) -> str | None:
     user = User.query.filter_by(username=username).first()
-
     if user and user.check_password(password):
-        access_token = create_access_token(identity=user.id)
-        return access_token
+        return create_access_token(identity=user.id)
     return None
 
-def get_user_chats(user_id):
-    chats = Chat.query.filter_by(user_id=user_id).all()
-    return [{'id': c.id, 'user_id': c.user_id, 'name': c.name} for c in chats]
 
-def create_message(chat_id, message, sender_type):
+def get_user_chats(user_id: str) -> list[dict[str, str]]:
+    chats = Chat.query.filter_by(user_id=user_id).all()
+    return [{"id": chat.id, "user_id": chat.user_id, "name": chat.name} for chat in chats]
+
+
+def create_message(chat_id: str, message: str, sender_type: MessageType) -> str:
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
-    new_message = Message(id=str(ulid()), chat_id=chat_id, sender_type=sender_type, message=message)
+
+    new_message = Message(
+        id=str(ulid()),
+        chat_id=chat_id,
+        sender_type=sender_type,
+        message=message,
+    )
     db.session.add(new_message)
     db.session.commit()
     return new_message.id
 
-def get_messages(chat_id, last_message_id=None, limit=10):
+
+def get_messages(
+    chat_id: str,
+    last_message_id: str | None = None,
+    limit: int = 10,
+) -> list[dict[str, str]]:
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
+
+    base_query = Message.query.filter_by(chat_id=chat_id).order_by(desc(Message.id))
     if last_message_id:
-        messages = Message.query.filter_by(chat_id=chat_id).filter(Message.id <= last_message_id).order_by(desc(Message.id)).limit(limit).all()
-    else:
-        messages = Message.query.filter_by(chat_id=chat_id).order_by(desc(Message.id)).limit(limit).all()
-    message_list = [{'id': m.id, 'message': m.message, 'sender_type': m.sender_type.name.lower()} for m in messages]
-    return message_list
+        base_query = base_query.filter(Message.id <= last_message_id)
+    messages = base_query.limit(limit).all()
 
-def is_user_in_chat(user_id, chat_id):
-    chat = Chat.query.filter_by(id=chat_id, user_id=user_id).first()
-    return chat is not None
+    return [
+        {
+            "id": message.id,
+            "message": message.message,
+            "sender_type": message.sender_type.name.lower(),
+        }
+        for message in messages
+    ]
 
-def delete_chat(chat_id):
+
+def is_user_in_chat(user_id: str, chat_id: str) -> bool:
+    return Chat.query.filter_by(id=chat_id, user_id=user_id).first() is not None
+
+
+def delete_chat(chat_id: str) -> None:
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
 
-    messages = Message.query.filter_by(chat_id=chat_id).all()
-    for message in messages:
+    for message in Message.query.filter_by(chat_id=chat_id).all():
         db.session.delete(message)
-
     db.session.delete(chat)
     db.session.commit()
 
-    return None
 
-def delete_message(message_id):
+def delete_message(message_id: str) -> None:
     message = Message.query.get(message_id)
     if not message:
         raise DoesNotExistError
     db.session.delete(message)
     db.session.commit()
-    return None
 
-def regenerate_message(message_id):
+
+def regenerate_message(message_id: str) -> tuple[list[str], str]:
     message = Message.query.get(message_id)
     if not message or message.sender_type != MessageType.ASSISTANT:
         raise DoesNotExistError
-    chat_id = message.chat_id
-    # Получаем все сообщения в чате по id (по возрастанию)
-    messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.id).all()
-    # Найти индекс текущего сообщения
-    idx = next((i for i, m in enumerate(messages) if m.id == message_id), None)
-    if idx is None:
-        raise DoesNotExistError
-    # Найти предыдущее user-сообщение
-    prev_user_msg = None
-    for m in reversed(messages[:idx]):
-        if m.sender_type == MessageType.USER:
-            prev_user_msg = m
-            break
-    if not prev_user_msg:
-        raise DoesNotExistError
-    # Собрать id всех сообщений, которые будут удалены (от текущего и далее)
-    to_delete = [m for m in messages[idx:]]
-    deleted_ids = [m.id for m in to_delete]
-    for m in to_delete:
-        db.session.delete(m)
-    # Обновить статус предыдущего user-сообщения
-    prev_user_msg.status = Status.NEW
-    db.session.commit()
-    return deleted_ids, prev_user_msg.id
 
-def edit_message(message_id, new_text):
+    messages = Message.query.filter_by(chat_id=message.chat_id).order_by(Message.id).all()
+    index = next((i for i, item in enumerate(messages) if item.id == message_id), None)
+    if index is None:
+        raise DoesNotExistError
+
+    previous_user_message = next(
+        (item for item in reversed(messages[:index]) if item.sender_type == MessageType.USER),
+        None,
+    )
+    if previous_user_message is None:
+        raise DoesNotExistError
+
+    messages_to_delete = messages[index:]
+    deleted_ids = [item.id for item in messages_to_delete]
+    for item in messages_to_delete:
+        db.session.delete(item)
+
+    previous_user_message.status = Status.NEW
+    db.session.commit()
+    return deleted_ids, previous_user_message.id
+
+
+def edit_message(message_id: str, new_text: str) -> str:
     message = Message.query.get(message_id)
     if not message:
         raise DoesNotExistError
@@ -114,65 +142,66 @@ def edit_message(message_id, new_text):
     db.session.commit()
     return message.id
 
-def create_entity(model, **kwargs):
-    """Универсальный создатель сущностей (World, Location, Persona, Profile)"""
+
+def create_entity(model: type[ModelT], **kwargs: Any) -> ModelT:
     entity = model(**kwargs)
     db.session.add(entity)
     db.session.commit()
     return entity
 
-def update_entity(model, entity_id, **kwargs):
-    """Универсальный редактор"""
+
+def update_entity(model: type[ModelT], entity_id: str, **kwargs: Any) -> ModelT:
     entity = model.query.get(entity_id)
     if not entity:
         raise DoesNotExistError
+
     for key, value in kwargs.items():
         if hasattr(entity, key):
             setattr(entity, key, value)
     db.session.commit()
     return entity
 
-def get_entities(model):
-    """Универсальный геттер"""
-    entities = model.query.all()
-    return entities
+
+def get_entities(model: type[ModelT]) -> list[ModelT]:
+    return model.query.all()
 
 
-def delete_entity(model, entity_id):
-    """Универсальное удаление сущности"""
+def delete_entity(model: type[ModelT], entity_id: str) -> None:
     entity = model.query.get(entity_id)
     if not entity:
         raise DoesNotExistError
     db.session.delete(entity)
     db.session.commit()
-    return None
 
-# Обновленная функция создания чата
-def create_user_chat(user_id, name, world_id=None, profile_id=None, persona_ids=None, location_ids=None):
-    from app.models import Persona, Location # локальный импорт во избежание циклов
-    
+
+def create_user_chat(
+    user_id: str,
+    name: str,
+    world_id: str | None = None,
+    profile_id: str | None = None,
+    persona_ids: list[str] | None = None,
+    location_ids: list[str] | None = None,
+) -> str:
     new_chat = Chat(
-        user_id=user_id, 
-        name=name, 
-        world_id=world_id, 
-        profile_id=profile_id
+        user_id=user_id,
+        name=name,
+        world_id=world_id,
+        profile_id=profile_id,
     )
-    
-    # Привязываем персонажей (Many-to-Many)
+
     if persona_ids:
-        personas = Persona.query.filter(Persona.id.in_(persona_ids)).all()
-        new_chat.personas.extend(personas)
-        
-    # Привязываем доступные локации (Many-to-Many)
+        new_chat.personas.extend(Persona.query.filter(Persona.id.in_(persona_ids)).all())
     if location_ids:
-        locations = Location.query.filter(Location.id.in_(location_ids)).all()
-        new_chat.available_locations.extend(locations)
+        new_chat.available_locations.extend(
+            Location.query.filter(Location.id.in_(location_ids)).all()
+        )
 
     db.session.add(new_chat)
     db.session.commit()
     return new_chat.id
 
-def add_persona_to_chat(chat_id, persona_id):
+
+def add_persona_to_chat(chat_id: str, persona_id: str) -> None:
     chat = Chat.query.get(chat_id)
     persona = Persona.query.get(persona_id)
     if not chat or not persona:

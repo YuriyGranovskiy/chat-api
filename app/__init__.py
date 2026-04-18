@@ -1,27 +1,24 @@
 import logging
 import os
 
-from flask import Flask, current_app
 from flask_openapi3 import OpenAPI, Info
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from flask import jsonify
 
 from app.config import Config
 from app.extensions import db, bcrypt, jwt
 from app.message_job import process_messages
 from app.sockets import register_socket_handlers
 
-import os
-
-log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'log')
+log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "log")
 os.makedirs(log_dir, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
+
 def create_app():
     def process_messages_background_task():
-        logger.info(f'Background task started!')
+        logger.info("Background task started")
         while True:
             with app.app_context():
                 process_messages(socketio)
@@ -30,7 +27,7 @@ def create_app():
     info = Info(title="Chat API", version="1.0.0")
     app = OpenAPI(__name__, info=info)
     CORS(app)
-    socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+    socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
     config = Config()
     app.config.from_object(config)
 
@@ -38,17 +35,16 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
     
-    # Регистрация Blueprint и создание таблиц
     from app.routes import bp as api_blueprint
-    app.register_api(api_blueprint, url_prefix='/api')
+
+    app.register_api(api_blueprint, url_prefix="/api")
     register_socket_handlers(socketio)
 
     with app.app_context():
         db.create_all()
 
-    # Запуск фоновой задачи (если нужно, логику можно оставить здесь)
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        logger.info('Starting background task in the main worker process...')
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        logger.info("Starting background task in the main worker process")
         socketio.start_background_task(target=process_messages_background_task)
-            
+
     return app, socketio

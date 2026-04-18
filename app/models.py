@@ -1,33 +1,38 @@
-from app.extensions import db, bcrypt
-from flask_sqlalchemy import SQLAlchemy
-from ulid import ulid
 import enum
+from ulid import ulid
 
-def get_ulid():
+from app.extensions import bcrypt, db
+
+
+def get_ulid() -> str:
     return str(ulid())
 
-chat_personas = db.Table('chat_personas',
-    db.Column('chat_id', db.String(28), db.ForeignKey('chat.id'), primary_key=True),
-    db.Column('persona_id', db.String(28), db.ForeignKey('persona.id'), primary_key=True)
+
+chat_personas = db.Table(
+    "chat_personas",
+    db.Column("chat_id", db.String(28), db.ForeignKey("chat.id"), primary_key=True),
+    db.Column("persona_id", db.String(28), db.ForeignKey("persona.id"), primary_key=True),
 )
 
-chat_locations = db.Table('chat_locations',
-    db.Column('chat_id', db.String(28), db.ForeignKey('chat.id'), primary_key=True),
-    db.Column('location_id', db.String(28), db.ForeignKey('location.id'), primary_key=True)
+chat_locations = db.Table(
+    "chat_locations",
+    db.Column("chat_id", db.String(28), db.ForeignKey("chat.id"), primary_key=True),
+    db.Column("location_id", db.String(28), db.ForeignKey("location.id"), primary_key=True),
 )
+
 
 class User(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
 
-    def set_password(self, password):
-        self.password_hash = bcrypt.generate_password_hash(password).decode('utf8')
+    def set_password(self, password: str) -> None:
+        self.password_hash = bcrypt.generate_password_hash(password).decode("utf8")
 
-    def check_password(self, password):
+    def check_password(self, password: str) -> bool:
         return bcrypt.check_password_hash(self.password_hash, password)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"User('{self.username}')"
 
 class MessageType(enum.Enum):
@@ -47,21 +52,21 @@ class World(db.Model):
 
 class Chat(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
-    user_id = db.Column(db.String(28), db.ForeignKey('user.id'))
+    user_id = db.Column(db.String(28), db.ForeignKey("user.id"))
     name = db.Column(db.String(64), nullable=False)
-    profile_id = db.Column(db.String(28), db.ForeignKey('user_profile.id'))
-    personas = db.relationship('Persona', secondary=chat_personas, backref='chats')
-    available_locations = db.relationship('Location', secondary=chat_locations)
-    world_id = db.Column(db.String(28), db.ForeignKey('world.id'))
+    profile_id = db.Column(db.String(28), db.ForeignKey("user_profile.id"))
+    personas = db.relationship("Persona", secondary=chat_personas, backref="chats")
+    available_locations = db.relationship("Location", secondary=chat_locations)
+    world_id = db.Column(db.String(28), db.ForeignKey("world.id"))
     scenario = db.Column(db.Text, nullable=True)
-    messages = db.relationship('Message', backref='chat', lazy=True)
-    
-    def __repr__(self):
+    messages = db.relationship("Message", backref="chat", lazy=True)
+
+    def __repr__(self) -> str:
         return f"Chat('{self.user_id}', '{self.name}')"
 
 class Message(db.Model):
     id = db.Column(db.String(28), primary_key=True)
-    chat_id = db.Column(db.String(28), db.ForeignKey('chat.id', ondelete='RESTRICT'))
+    chat_id = db.Column(db.String(28), db.ForeignKey("chat.id", ondelete="RESTRICT"))
     sender_type = db.Column(db.Enum(MessageType))
     message = db.Column(db.String(1024), nullable=False)
     status = db.Column(db.Enum(Status), default=Status.NEW, server_default=Status.NEW.name)
@@ -71,7 +76,7 @@ class UserProfile(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=get_ulid)
     name = db.Column(db.String(64), nullable=False)
     description = db.Column(db.Text)
-    chats = db.relationship('Chat', backref='user_profile', lazy=True)
+    chats = db.relationship("Chat", backref="user_profile", lazy=True)
 
 class Location(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=get_ulid)

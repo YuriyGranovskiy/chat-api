@@ -1,6 +1,6 @@
-from typing import Any, List, Optional
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class RegisterBody(BaseModel):
     username: str
@@ -52,11 +52,11 @@ class ErrorData(BaseModel):
 
 class CreateChatBody(BaseModel):
     name: str
-    world_id: Optional[str] = None
+    world_id: str | None = None
     profile_id: str
-    persona_ids: List[str] = []
-    location_ids: List[str] = []
-    initial: Optional[str] = None
+    persona_ids: list[str] = Field(default_factory=list)
+    location_ids: list[str] = Field(default_factory=list)
+    initial: str | None = None
 
 class AddPersonaBody(BaseModel):
     persona_id: str
@@ -65,20 +65,20 @@ class CreateMessageBody(BaseModel):
     message: str
 
 class MessagesResponseBody(BaseModel):
-    messages: List[dict[str, Any]] = []
+    messages: list[dict[str, Any]] = Field(default_factory=list)
 
 class ChatsResponseBody(BaseModel):
-    chats: List[dict[str, Any]]
+    chats: list[dict[str, Any]]
 
 class GetChatResponseBody(BaseModel):
     id: str
     name: str
     user_id: str
-    messages: List[dict[str, Any]]
+    messages: list[dict[str, Any]]
 
 class MessagesQuery(BaseModel):
     limit: int = 10
-    last_message_id: Optional[str] = None
+    last_message_id: str | None = None
 
 class PersonaData(BaseModel):
     id: str
