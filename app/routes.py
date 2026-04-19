@@ -119,7 +119,11 @@ def get_chat(path: ChatPath):
 
     messages = Message.query.filter_by(chat_id=path.chat_id).all()
     message_list = [
-        {"id": message.id, "user_id": chat.user_id, "message": message.message}
+        {
+            "id": message.id,
+            "user_id": chat.user_id,
+            "message": services.message_text_for_client(message),
+        }
         for message in messages
     ]
     return GetChatResponseBody(

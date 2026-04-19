@@ -10,6 +10,10 @@ from sqlalchemy import asc
 from transformers import AutoTokenizer
 from ulid import ulid
 
+from app.assistant_message_parse import (
+    assistant_raw_for_model,
+    split_assistant_content,
+)
 from app.logging_config import get_logging_config
 from app.models import Chat, Message, MessageType, Status, db
 
@@ -77,7 +81,14 @@ def _messages_for_model(chat: Chat) -> list[dict[str, str]]:
             if chat_message.sender_type == MessageType.ASSISTANT
             else "user"
         )
-        model_messages.append({"role": role, "content": chat_message.message})
+        if chat_message.sender_type == MessageType.ASSISTANT:
+            content = assistant_raw_for_model(
+                chat_message.message,
+                chat_message.assistant_meta,
+            )
+        else:
+            content = chat_message.message
+        model_messages.append({"role": role, "content": content})
 
     return model_messages
 
@@ -106,12 +117,14 @@ def process_messages(socketio_app: Any) -> None:
                 options=OLLAMA_OPTIONS,
             )
             content = result["message"]["content"]
+            display_text, meta = split_assistant_content(content)
             processed_message_id = str(ulid())
             assistant_message = Message(
                 id=processed_message_id,
                 chat_id=chat.id,
                 sender_type=MessageType.ASSISTANT,
-                message=content,
+                message=display_text,
+                assistant_meta=meta,
                 status=Status.PROCESSED,
             )
             db.session.add(assistant_message)
@@ -123,7 +136,7 @@ def process_messages(socketio_app: Any) -> None:
                 "new_message",
                 {
                     "id": processed_message_id,
-                    "message": content,
+                    "message": display_text,
                     "sender_type": "assistant",
                 },
                 room=chat.id,

@@ -6,6 +6,10 @@ from flask_jwt_extended import create_access_token
 from sqlalchemy import desc
 from ulid import ulid
 
+from app.assistant_message_parse import (
+    assistant_display_for_client,
+    split_assistant_content,
+)
 from app.models import (
     Chat,
     DoesNotExistError,
@@ -44,16 +48,28 @@ def get_user_chats(user_id: str) -> list[dict[str, str]]:
     return [{"id": chat.id, "user_id": chat.user_id, "name": chat.name} for chat in chats]
 
 
+def message_text_for_client(message: Message) -> str:
+    if message.sender_type == MessageType.ASSISTANT:
+        return assistant_display_for_client(message.message, message.assistant_meta)
+    return message.message
+
+
 def create_message(chat_id: str, message: str, sender_type: MessageType) -> str:
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
 
+    assistant_meta: str | None = None
+    body = message
+    if sender_type == MessageType.ASSISTANT:
+        body, assistant_meta = split_assistant_content(message)
+
     new_message = Message(
         id=str(ulid()),
         chat_id=chat_id,
         sender_type=sender_type,
-        message=message,
+        message=body,
+        assistant_meta=assistant_meta,
     )
     db.session.add(new_message)
     db.session.commit()
@@ -77,7 +93,7 @@ def get_messages(
     return [
         {
             "id": message.id,
-            "message": message.message,
+            "message": message_text_for_client(message),
             "sender_type": message.sender_type.name.lower(),
         }
         for message in messages
@@ -138,7 +154,12 @@ def edit_message(message_id: str, new_text: str) -> str:
     message = Message.query.get(message_id)
     if not message:
         raise DoesNotExistError
-    message.message = new_text
+    if message.sender_type == MessageType.ASSISTANT:
+        body, assistant_meta = split_assistant_content(new_text)
+        message.message = body
+        message.assistant_meta = assistant_meta
+    else:
+        message.message = new_text
     db.session.commit()
     return message.id
 
