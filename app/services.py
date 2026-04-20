@@ -80,7 +80,7 @@ def get_messages(
     chat_id: str,
     last_message_id: str | None = None,
     limit: int = 10,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     chat = Chat.query.get(chat_id)
     if not chat:
         raise DoesNotExistError
@@ -95,6 +95,7 @@ def get_messages(
             "id": message.id,
             "message": message_text_for_client(message),
             "sender_type": message.sender_type.name.lower(),
+            "assistant_meta": message.assistant_meta,
         }
         for message in messages
     ]

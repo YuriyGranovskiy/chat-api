@@ -25,7 +25,11 @@ rules = (
     "2. Each paragraph must be exactly 2-3 sentences long.\n"
     "3. Be extremely concise. Avoid purple prose and long metaphors.\n"
     "4. Format actions in asterisks and speech in quotes.\n"
-    "5. After the second paragraph write the name of the location and the characters in JSON format strictly: {\"location\": <location name>, \"persons\": [ List of person's names in current location ]}.\n"
+    "5. After the second paragraph output scene JSON strictly with keys: "
+    "\"location\" (string), \"persons\" (names present in the scene), "
+    "\"clothing\" and \"ammunition\" (objects mapping each name in persons to a short string). "
+    "Use empty string or omit a name if unknown; use empty objects {} if no weapons apply. "
+    "Example: {\"location\": \"...\", \"persons\": [\"A\"], \"clothing\": {\"A\": \"...\"}, \"ammunition\": {\"A\": \"...\"}}.\n"
     "6. When the user speaks to a specific personas, respond as them.\n"
     "7. Prefix persona's speech with their name, e.g., AKIRA: \"...\"\n\n"
 )
@@ -138,6 +142,7 @@ def process_messages(socketio_app: Any) -> None:
                     "id": processed_message_id,
                     "message": display_text,
                     "sender_type": "assistant",
+                    "assistant_meta": meta,
                 },
                 room=chat.id,
                 include_self=True,

@@ -123,6 +123,7 @@ def get_chat(path: ChatPath):
             "id": message.id,
             "user_id": chat.user_id,
             "message": services.message_text_for_client(message),
+            "assistant_meta": message.assistant_meta,
         }
         for message in messages
     ]

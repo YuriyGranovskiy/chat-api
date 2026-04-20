@@ -69,7 +69,7 @@ class Message(db.Model):
     chat_id = db.Column(db.String(28), db.ForeignKey("chat.id", ondelete="RESTRICT"))
     sender_type = db.Column(db.Enum(MessageType))
     message = db.Column(db.String(1024), nullable=False)
-    # JSON scene metadata (location, persons); NULL for user/system and legacy rows.
+    # JSON scene metadata (location, persons, clothing, ammunition, ...); NULL for user/system and legacy rows.
     # Existing DBs: ALTER TABLE message ADD COLUMN assistant_meta TEXT;
     assistant_meta = db.Column(db.Text, nullable=True)
     status = db.Column(db.Enum(Status), default=Status.NEW, server_default=Status.NEW.name)

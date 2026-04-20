@@ -26,14 +26,21 @@ class SplitAssistantContentTests(unittest.TestCase):
     def test_fenced_json_block(self) -> None:
         raw = (
             'Para one.\n\nPara two.\n\n```json\n'
-            '{"location": "Mansion: Grand hall", "persons": ["Sharn", "Ember"]}\n```'
+            '{"location": "Mansion: Grand hall", "persons": ["Sharn", "Ember"], '
+            '"ammunition": {"Ember": "knife", "Sharn": "pistol, 2 mags"}, '
+            '"clothing": {"Ember": "leather jacket", "Sharn": "suit"}}\n```'
         )
         display, meta = split_assistant_content(raw)
         self.assertEqual(display, "Para one.\n\nPara two.")
         self.assertIsNotNone(meta)
         self.assertEqual(
             json.loads(meta),
-            {"location": "Mansion: Grand hall", "persons": ["Sharn", "Ember"]},
+            {
+                "location": "Mansion: Grand hall",
+                "persons": ["Sharn", "Ember"],
+                "clothing": {"Ember": "leather jacket", "Sharn": "suit"},
+                "ammunition": {"Ember": "knife", "Sharn": "pistol, 2 mags"},
+            },
         )
 
     def test_trailing_json(self) -> None:
@@ -67,7 +74,9 @@ class SplitAssistantContentTests(unittest.TestCase):
 class AssistantHelpersTests(unittest.TestCase):
     def test_assistant_content_for_model_roundtrip(self) -> None:
         display = "A\n\nB"
-        meta = '{"location": "x", "persons": []}'
+        meta = (
+            '{"ammunition": {}, "clothing": {}, "location": "x", "persons": []}'
+        )
         full = assistant_content_for_model(display, meta)
         d2, m2 = split_assistant_content(full)
         self.assertEqual(d2, display)

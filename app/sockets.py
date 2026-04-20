@@ -174,10 +174,10 @@ def register_socket_handlers(socketio_app):
             return emit("error", {"message": "Access denied"})
         try:
             edit_message(message_id, new_text)
-            emit(
-                "message_edited",
-                {"message_id": message_id, "message": new_text},
-                room=chat_id,
-            )
+            message_after = Message.query.get(message_id)
+            payload: dict = {"message_id": message_id, "message": new_text}
+            if message_after and message_after.sender_type == MessageType.ASSISTANT:
+                payload["assistant_meta"] = message_after.assistant_meta
+            emit("message_edited", payload, room=chat_id)
         except DoesNotExistError:
             emit("error", {"message": "Edit failed"})

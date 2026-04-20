@@ -49,19 +49,22 @@ def _try_split_fenced_json(raw: str) -> tuple[str, str | None] | None:
 
 def _try_split_trailing_json(raw: str) -> tuple[str, str | None]:
     text = raw.rstrip()
-    brace = text.rfind("{")
-    if brace == -1:
-        return raw, None
-    try:
-        obj, end = json.JSONDecoder().raw_decode(text[brace:])
-    except json.JSONDecodeError:
-        return raw, None
-    if brace + end != len(text):
-        return raw, None
-    meta = _canonical_json_string(obj)
-    display = text[:brace].rstrip()
-    return display, meta
-
+    search_end = len(text)
+    while search_end > 0:
+        brace = text.rfind("{", 0, search_end)
+        if brace == -1:
+            return raw, None
+        try:
+            obj, end = json.JSONDecoder().raw_decode(text[brace:])
+        except json.JSONDecodeError:
+            search_end = brace
+            continue
+        if brace + end == len(text):
+            meta = _canonical_json_string(obj)
+            display = text[:brace].rstrip()
+            return display, meta
+        search_end = brace
+    return raw, None
 
 def assistant_content_for_model(display: str, meta: str | None) -> str:
     """Rebuild full assistant message text for the LLM (matches prior model output shape)."""
