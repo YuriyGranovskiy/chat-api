@@ -35,7 +35,7 @@ rules = (
     "Use empty string or omit a name if unknown; use empty objects {} if no weapons apply. "
     "Example: {\"location\": \"...\", \"location_description\": \"...\", \"persons\": [\"A\"], "
     "\"person_descriptions\": {\"A\": \"...\"}, \"clothing\": {\"A\": \"...\"}, \"ammunition\": {\"A\": \"...\"}}.\n"
-    "Fill location_description only if the location is new.\n"
+    "Fill location_description only if the location is new.  Don't add transit locations like \"doorway\".\n"
     "6. When the user speaks to a specific personas, respond as them.\n"
     "7. Prefix persona's speech with their name, e.g., AKIRA: \"...\"\n\n"
 )
