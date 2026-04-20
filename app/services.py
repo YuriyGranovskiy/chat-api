@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
+import ulid
 from flask_jwt_extended import create_access_token
 from sqlalchemy import desc
-from ulid import ulid
 
 from app.assistant_message_parse import (
     assistant_display_for_client,
@@ -65,7 +65,7 @@ def create_message(chat_id: str, message: str, sender_type: MessageType) -> str:
         body, assistant_meta = split_assistant_content(message)
 
     new_message = Message(
-        id=str(ulid()),
+        id=str(ulid.new()),
         chat_id=chat_id,
         sender_type=sender_type,
         message=body,

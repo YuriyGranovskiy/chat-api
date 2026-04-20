@@ -1,11 +1,15 @@
 import enum
-from ulid import ulid
+import ulid
 
 from app.extensions import bcrypt, db
 
 
+def _new_ulid() -> str:
+    return str(ulid.new())
+
+
 def get_ulid() -> str:
-    return str(ulid())
+    return _new_ulid()
 
 
 chat_personas = db.Table(
@@ -22,7 +26,7 @@ chat_locations = db.Table(
 
 
 class User(db.Model):
-    id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
+    id = db.Column(db.String(28), primary_key=True, default=get_ulid)
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
 
@@ -51,7 +55,7 @@ class World(db.Model):
     description = db.Column(db.Text)
 
 class Chat(db.Model):
-    id = db.Column(db.String(28), primary_key=True, default=lambda: str(ulid()))
+    id = db.Column(db.String(28), primary_key=True, default=_new_ulid)
     user_id = db.Column(db.String(28), db.ForeignKey("user.id"))
     name = db.Column(db.String(64), nullable=False)
     profile_id = db.Column(db.String(28), db.ForeignKey("user_profile.id"))
