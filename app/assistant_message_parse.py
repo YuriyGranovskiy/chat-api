@@ -11,6 +11,53 @@ def _canonical_json_string(obj: object) -> str:
     return json.dumps(obj, ensure_ascii=False, sort_keys=True)
 
 
+def _repair_broken_top_level_object(candidate: str) -> str:
+    """
+    Heuristic repair for common LLM JSON glitches:
+    - premature closing `}` of the top-level object before more keys follow
+    - missing trailing `}` for the top-level object
+    """
+    out: list[str] = []
+    depth = 0
+    in_string = False
+    escape = False
+    for idx, char in enumerate(candidate):
+        if escape:
+            out.append(char)
+            escape = False
+            continue
+        if char == "\\":
+            out.append(char)
+            if in_string:
+                escape = True
+            continue
+        if char == '"':
+            out.append(char)
+            in_string = not in_string
+            continue
+        if in_string:
+            out.append(char)
+            continue
+        if char == "{":
+            depth += 1
+            out.append(char)
+            continue
+        if char == "}":
+            if depth <= 0:
+                continue
+            if depth == 1 and candidate[idx + 1 :].strip():
+                # Skip premature close of top-level object when there is trailing content.
+                continue
+            depth -= 1
+            out.append(char)
+            continue
+        out.append(char)
+
+    if depth > 0:
+        out.extend("}" * depth)
+    return "".join(out).strip()
+
+
 def split_assistant_content(raw: str) -> tuple[str, str | None]:
     """
     Split visible narrative text and trailing scene JSON.
@@ -36,7 +83,11 @@ def _try_split_fenced_json(raw: str) -> tuple[str, str | None] | None:
     try:
         obj = json.loads(inner)
     except json.JSONDecodeError:
-        return None
+        repaired_inner = _repair_broken_top_level_object(inner)
+        try:
+            obj = json.loads(repaired_inner)
+        except json.JSONDecodeError:
+            return None
     meta = _canonical_json_string(obj)
     before = raw[:block_start].rstrip()
     after = raw[close + 3 :].lstrip()
@@ -53,17 +104,36 @@ def _try_split_trailing_json(raw: str) -> tuple[str, str | None]:
     while search_end > 0:
         brace = text.rfind("{", 0, search_end)
         if brace == -1:
-            return raw, None
+            break
         try:
             obj, end = json.JSONDecoder().raw_decode(text[brace:])
         except json.JSONDecodeError:
-            search_end = brace
-            continue
+            repaired = _repair_broken_top_level_object(text[brace:])
+            try:
+                obj = json.loads(repaired)
+            except json.JSONDecodeError:
+                search_end = brace
+                continue
+            meta = _canonical_json_string(obj)
+            display = text[:brace].rstrip()
+            return display, meta
         if brace + end == len(text):
             meta = _canonical_json_string(obj)
             display = text[:brace].rstrip()
             return display, meta
         search_end = brace
+
+    first_brace = text.find("{")
+    if first_brace != -1:
+        repaired = _repair_broken_top_level_object(text[first_brace:])
+        try:
+            obj = json.loads(repaired)
+        except json.JSONDecodeError:
+            return raw, None
+        meta = _canonical_json_string(obj)
+        display = text[:first_brace].rstrip()
+        return display, meta
+
     return raw, None
 
 def assistant_content_for_model(display: str, meta: str | None) -> str:

@@ -6,7 +6,7 @@ from flask import Flask
 
 from app.extensions import db
 from app.message_job import process_messages
-from app.models import Chat, Location, Message, MessageType, Status
+from app.models import Chat, Location, Message, MessageType, Persona, Status
 
 
 class _SocketStub:
@@ -107,6 +107,68 @@ class ProcessMessagesLocationTests(unittest.TestCase):
             from app.message_job import count_tokens
 
             self.assertEqual(count_tokens([{"role": "user", "content": "hello"}]), 0)
+
+    def test_new_persons_are_created_linked_and_exposed_in_meta(self) -> None:
+        chat = self._create_chat_with_pending_user_message()
+        socket = _SocketStub()
+        assistant_content = (
+            "Paragraph one.\n\nParagraph two.\n\n"
+            '{"location":"Dark Forest","location_description":"Misty pines",'
+            '"persons":["  Akira  ","Ember"],'
+            '"person_descriptions":{"Akira":"Scout with a cold stare"," Ember ":"Fast sharpshooter"},'
+            '"clothing":{"Akira":"cloak","Ember":"jacket"},'
+            '"ammunition":{"Akira":"knife","Ember":"pistol"}}'
+        )
+
+        with (
+            mock.patch("app.message_job.ollama.chat", return_value={"message": {"content": assistant_content}}),
+            mock.patch("app.message_job.count_tokens", return_value=0),
+        ):
+            process_messages(socket)
+
+        personas = Persona.query.order_by(Persona.name.asc()).all()
+        self.assertEqual([persona.name for persona in personas], ["Akira", "Ember"])
+        self.assertTrue(all(persona in chat.personas for persona in personas))
+
+        assistant_message = Message.query.filter_by(sender_type=MessageType.ASSISTANT).one()
+        parsed_meta = json.loads(assistant_message.assistant_meta or "{}")
+        self.assertEqual(parsed_meta["persons"], ["Akira", "Ember"])
+        self.assertEqual(
+            parsed_meta["new_persons"],
+            [
+                {"name": "Akira", "description": "Scout with a cold stare"},
+                {"name": "Ember", "description": "Fast sharpshooter"},
+            ],
+        )
+
+    def test_existing_person_is_reused_case_insensitively(self) -> None:
+        chat = self._create_chat_with_pending_user_message()
+        existing_persona = Persona(name="Akira", description="Known person")
+        db.session.add(existing_persona)
+        db.session.commit()
+        socket = _SocketStub()
+        assistant_content = (
+            "Paragraph one.\n\nParagraph two.\n\n"
+            '{"location":"Dark Forest","persons":[" akira "],'
+            '"person_descriptions":{"akira":"Should be ignored for creation"},'
+            '"clothing":{"akira":"cloak"},'
+            '"ammunition":{"akira":"knife"},'
+            '"new_persons":[{"name":"x","description":"x"}]}'
+        )
+
+        with (
+            mock.patch("app.message_job.ollama.chat", return_value={"message": {"content": assistant_content}}),
+            mock.patch("app.message_job.count_tokens", return_value=0),
+        ):
+            process_messages(socket)
+
+        self.assertEqual(Persona.query.count(), 1)
+        self.assertIn(existing_persona, chat.personas)
+
+        assistant_message = Message.query.filter_by(sender_type=MessageType.ASSISTANT).one()
+        parsed_meta = json.loads(assistant_message.assistant_meta or "{}")
+        self.assertEqual(parsed_meta["persons"], ["akira"])
+        self.assertNotIn("new_persons", parsed_meta)
 
 
 if __name__ == "__main__":

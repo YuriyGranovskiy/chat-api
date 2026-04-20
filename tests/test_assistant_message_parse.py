@@ -70,6 +70,21 @@ class SplitAssistantContentTests(unittest.TestCase):
         self.assertEqual(display.strip(), "Text")
         self.assertEqual(json.loads(meta or ""), {"location": "x", "persons": []})
 
+    def test_repairs_premature_top_level_closing_brace(self) -> None:
+        raw = (
+            "Narrative.\n\n"
+            '{"ammunition": {"Lysara": "bow"}, "clothing": {"Lysara": "leather"}, '
+            '"location": "Blackroot tavern", "location_description": "dim room"}, '
+            '"person_descriptions": {"Lysara": "sharp"}, "persons": ["Lysara", "Vayruld"]}'
+        )
+        display, meta = split_assistant_content(raw)
+        self.assertEqual(display, "Narrative.")
+        self.assertIsNotNone(meta)
+        parsed = json.loads(meta or "{}")
+        self.assertEqual(parsed["location"], "Blackroot tavern")
+        self.assertEqual(parsed["persons"], ["Lysara", "Vayruld"])
+        self.assertEqual(parsed["person_descriptions"]["Lysara"], "sharp")
+
 
 class AssistantHelpersTests(unittest.TestCase):
     def test_assistant_content_for_model_roundtrip(self) -> None:
