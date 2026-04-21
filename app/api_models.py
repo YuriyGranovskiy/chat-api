@@ -1,5 +1,6 @@
 from typing import Any
 
+from flask_openapi3 import FileStorage
 from pydantic import BaseModel, Field
 
 class RegisterBody(BaseModel):
@@ -47,6 +48,15 @@ class LocationPath(BaseModel):
 class ProfilePath(BaseModel):
     profile_id: str
 
+
+class MediaPath(BaseModel):
+    token: str
+
+
+class EntityImageUploadForm(BaseModel):
+    file: FileStorage
+
+
 class ErrorData(BaseModel):
     error: str
 
@@ -83,7 +93,8 @@ class MessagesQuery(BaseModel):
 class PersonaData(BaseModel):
     id: str
     name: str
-    description: str
+    description: str | None = None
+    image_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -94,7 +105,8 @@ class PersonasListResponse(BaseModel):
 class LocationData(BaseModel):
     id: str
     name: str
-    description: str
+    description: str | None = None
+    image_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -106,7 +118,8 @@ class LocationsListResponse(BaseModel):
 class WorldData(BaseModel):
     id: str
     name: str
-    description: str
+    description: str | None = None
+    image_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -118,7 +131,7 @@ class WorldsListResponse(BaseModel):
 class ProfileData(BaseModel):
     id: str
     name: str
-    description: str
+    description: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -31,6 +31,11 @@ def create_app():
     config = Config()
     app.config.from_object(config)
 
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    media_root = os.path.join(project_root, app.config["MEDIA_FOLDER"])
+    app.config["MEDIA_ROOT"] = media_root
+    os.makedirs(media_root, exist_ok=True)
+
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)

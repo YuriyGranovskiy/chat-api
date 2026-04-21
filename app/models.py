@@ -53,6 +53,14 @@ class World(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=get_ulid)
     name = db.Column(db.String(64), nullable=False)
     description = db.Column(db.Text)
+    image_path = db.Column(db.String(512), nullable=True)
+    image_access_token = db.Column(db.String(64), nullable=True, unique=True)
+
+    @property
+    def image_url(self) -> str | None:
+        if self.image_access_token:
+            return f"/api/media/{self.image_access_token}"
+        return None
 
 class Chat(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=_new_ulid)
@@ -89,12 +97,28 @@ class Location(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=get_ulid)
     name = db.Column(db.String(64), nullable=False)
     description = db.Column(db.Text)
+    image_path = db.Column(db.String(512), nullable=True)
+    image_access_token = db.Column(db.String(64), nullable=True, unique=True)
+
+    @property
+    def image_url(self) -> str | None:
+        if self.image_access_token:
+            return f"/api/media/{self.image_access_token}"
+        return None
 
 class Persona(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=get_ulid)
     name = db.Column(db.String(64), nullable=False)
     description = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
+    image_path = db.Column(db.String(512), nullable=True)
+    image_access_token = db.Column(db.String(64), nullable=True, unique=True)
+
+    @property
+    def image_url(self) -> str | None:
+        if self.image_access_token:
+            return f"/api/media/{self.image_access_token}"
+        return None
 
 class DoesNotExistError(Exception):
     pass

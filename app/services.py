@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
+import secrets
 from typing import Any, TypeVar
 
 import ulid
+from flask import current_app
 from flask_jwt_extended import create_access_token
 from sqlalchemy import desc
+from werkzeug.datastructures import FileStorage
 
 from app.assistant_message_parse import (
     assistant_display_for_client,
@@ -19,6 +23,7 @@ from app.models import (
     Persona,
     Status,
     User,
+    World,
     db,
 )
 
@@ -188,10 +193,128 @@ def get_entities(model: type[ModelT]) -> list[ModelT]:
     return model.query.all()
 
 
+def _safe_unlink(path: str) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _mime_from_magic(data: bytes) -> str | None:
+    if len(data) >= 3 and data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(data) >= 8 and data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if len(data) >= 6 and (data.startswith(b"GIF87a") or data.startswith(b"GIF89a")):
+        return "image/gif"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _resolve_image_mime(file_storage: FileStorage, data: bytes) -> str | None:
+    raw = (file_storage.mimetype or "").split(";")[0].strip().lower()
+    allowed: frozenset[str] = current_app.config["ALLOWED_IMAGE_MIMES"]
+    if raw in allowed:
+        return raw
+    magic = _mime_from_magic(data)
+    if magic in allowed:
+        return magic
+    return None
+
+
+def _allocate_image_token() -> str:
+    for _ in range(32):
+        token = secrets.token_urlsafe(32)
+        taken = (
+            World.query.filter_by(image_access_token=token).first() is not None
+            or Persona.query.filter_by(image_access_token=token).first() is not None
+            or Location.query.filter_by(image_access_token=token).first() is not None
+        )
+        if not taken:
+            return token
+    raise RuntimeError("Could not allocate a unique image token")
+
+
+def _remove_stored_image(entity: Any) -> None:
+    rel = getattr(entity, "image_path", None)
+    if not rel:
+        return
+    path = os.path.join(current_app.config["MEDIA_ROOT"], rel)
+    _safe_unlink(path)
+
+
+def set_entity_image(model: type[ModelT], entity_id: str, file_storage: FileStorage) -> None:
+    entity = model.query.get(entity_id)
+    if not entity:
+        raise DoesNotExistError
+    if not file_storage or not file_storage.filename:
+        raise ValueError("No file")
+
+    data = file_storage.read()
+    if not data:
+        raise ValueError("Empty file")
+    max_bytes: int = current_app.config["MAX_IMAGE_BYTES"]
+    if len(data) > max_bytes:
+        raise ValueError("File too large")
+
+    mime = _resolve_image_mime(file_storage, data)
+    if not mime:
+        raise ValueError("Unsupported image type")
+
+    mime_to_ext: dict[str, str] = current_app.config["MIME_TO_EXT"]
+    ext = mime_to_ext[mime]
+    media_root: str = current_app.config["MEDIA_ROOT"]
+
+    old_path = getattr(entity, "image_path", None)
+    if not entity.image_access_token:
+        entity.image_access_token = _allocate_image_token()
+
+    rel_path = f"{entity.image_access_token}{ext}"
+    abs_path = os.path.join(media_root, rel_path)
+
+    if old_path and old_path != rel_path:
+        _safe_unlink(os.path.join(media_root, old_path))
+
+    with open(abs_path, "wb") as f:
+        f.write(data)
+
+    entity.image_path = rel_path
+    db.session.commit()
+
+
+def clear_entity_image(model: type[ModelT], entity_id: str) -> None:
+    entity = model.query.get(entity_id)
+    if not entity:
+        raise DoesNotExistError
+    _remove_stored_image(entity)
+    entity.image_path = None
+    entity.image_access_token = None
+    db.session.commit()
+
+
+def resolve_media_file(token: str) -> tuple[str, str] | None:
+    mime_to_ext: dict[str, str] = current_app.config["MIME_TO_EXT"]
+    ext_to_mime = {v: k for k, v in mime_to_ext.items()}
+
+    for model_cls in (World, Persona, Location):
+        entity = model_cls.query.filter_by(image_access_token=token).first()
+        if entity and entity.image_path:
+            root: str = current_app.config["MEDIA_ROOT"]
+            abs_path = os.path.join(root, entity.image_path)
+            if not os.path.isfile(abs_path):
+                return None
+            ext = os.path.splitext(entity.image_path)[1].lower()
+            mime = ext_to_mime.get(ext, "application/octet-stream")
+            return abs_path, mime
+    return None
+
+
 def delete_entity(model: type[ModelT], entity_id: str) -> None:
     entity = model.query.get(entity_id)
     if not entity:
         raise DoesNotExistError
+    _remove_stored_image(entity)
     db.session.delete(entity)
     db.session.commit()
 

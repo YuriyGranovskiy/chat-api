@@ -23,6 +23,43 @@ DEFAULT_DB = ROOT / "instance" / "chat.db"
 FALLBACK_DB = ROOT / "chat.db"
 
 
+def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cur.fetchall()]
+
+
+def migrate_entity_images(conn: sqlite3.Connection) -> bool:
+    """Add image_path and image_access_token to world, persona, location."""
+    changed = False
+    for table in ("world", "persona", "location"):
+        columns = _table_columns(conn, table)
+        if not columns:
+            print(f"Table `{table}` not found; skip image columns.", file=sys.stderr)
+            continue
+        if "image_path" not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN image_path TEXT")
+            changed = True
+            print(f"Migration applied: {table}.image_path (TEXT, nullable).")
+        if "image_access_token" not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN image_access_token TEXT")
+            changed = True
+            print(f"Migration applied: {table}.image_access_token (TEXT, nullable).")
+    if changed:
+        for table in ("world", "persona", "location"):
+            idx = f"ix_{table}_image_access_token"
+            try:
+                conn.execute(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS {idx} ON {table}(image_access_token) "
+                    "WHERE image_access_token IS NOT NULL"
+                )
+            except sqlite3.OperationalError as e:
+                print(f"Note: could not create index {idx}: {e}", file=sys.stderr)
+        conn.commit()
+    elif _table_columns(conn, "world") and "image_path" in _table_columns(conn, "world"):
+        print("Entity image columns already present; nothing to do for images.")
+    return True
+
+
 def migrate_assistant_meta(conn: sqlite3.Connection) -> bool:
     cur = conn.execute("PRAGMA table_info(message)")
     columns = [row[1] for row in cur.fetchall()]
@@ -56,6 +93,7 @@ def main() -> int:
     conn = sqlite3.connect(db_path)
     try:
         migrate_assistant_meta(conn)
+        migrate_entity_images(conn)
     finally:
         conn.close()
     return 0

@@ -1,3 +1,4 @@
+from flask import send_file
 from flask_openapi3 import APIBlueprint
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
@@ -9,12 +10,14 @@ from app.api_models import (
     CreateChatBody,
     CreatedBody,
     CreateMessageBody,
+    EntityImageUploadForm,
     ErrorData,
     GetChatResponseBody,
     LocationBody,
     LocationPath,
     LocationsListResponse,
     LoginBody,
+    MediaPath,
     MessagesQuery,
     MessagesResponseBody,
     PersonaBody,
@@ -41,6 +44,16 @@ from app.models import (
 )
 
 bp = APIBlueprint("users", __name__)
+
+
+@bp.get("/media/<string:token>")
+def get_media(path: MediaPath):
+    resolved = services.resolve_media_file(path.token)
+    if not resolved:
+        return ErrorData(error="Not found").model_dump(), 404
+    abs_path, mime = resolved
+    return send_file(abs_path, mimetype=mime)
+
 
 @bp.post("/register", responses={201: TokenResponse})
 def register(body: RegisterBody) -> TokenResponse:
@@ -184,6 +197,33 @@ def delete_world(path: WorldPath):
     except DoesNotExistError:
         return ErrorData(error='World not found').model_dump(), 404
 
+
+@bp.put("/worlds/<string:world_id>/image")
+@jwt_required()
+def put_world_image(path: WorldPath, form: EntityImageUploadForm):
+    if not path.world_id:
+        return ErrorData(error="World ID is required").model_dump(), 400
+    try:
+        services.set_entity_image(World, path.world_id, form.file)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="World not found").model_dump(), 404
+    except ValueError as e:
+        return ErrorData(error=str(e)).model_dump(), 400
+
+
+@bp.delete("/worlds/<string:world_id>/image")
+@jwt_required()
+def delete_world_image(path: WorldPath):
+    if not path.world_id:
+        return ErrorData(error="World ID is required").model_dump(), 400
+    try:
+        services.clear_entity_image(World, path.world_id)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="World not found").model_dump(), 404
+
+
 @bp.post("/locations")
 @jwt_required()
 def create_location(body: LocationBody):
@@ -210,6 +250,33 @@ def delete_location(path: LocationPath):
     except DoesNotExistError:
         return ErrorData(error='Location not found').model_dump(), 404
 
+
+@bp.put("/locations/<string:location_id>/image")
+@jwt_required()
+def put_location_image(path: LocationPath, form: EntityImageUploadForm):
+    if not path.location_id:
+        return ErrorData(error="Location ID is required").model_dump(), 400
+    try:
+        services.set_entity_image(Location, path.location_id, form.file)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="Location not found").model_dump(), 404
+    except ValueError as e:
+        return ErrorData(error=str(e)).model_dump(), 400
+
+
+@bp.delete("/locations/<string:location_id>/image")
+@jwt_required()
+def delete_location_image(path: LocationPath):
+    if not path.location_id:
+        return ErrorData(error="Location ID is required").model_dump(), 400
+    try:
+        services.clear_entity_image(Location, path.location_id)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="Location not found").model_dump(), 404
+
+
 @bp.post("/personas")
 @jwt_required()
 def create_persona(body: PersonaBody):
@@ -235,6 +302,33 @@ def delete_persona(path: PersonaPath):
         return "", 200
     except DoesNotExistError:
         return ErrorData(error='Persona not found').model_dump(), 404
+
+
+@bp.put("/personas/<string:persona_id>/image")
+@jwt_required()
+def put_persona_image(path: PersonaPath, form: EntityImageUploadForm):
+    if not path.persona_id:
+        return ErrorData(error="Persona ID is required").model_dump(), 400
+    try:
+        services.set_entity_image(Persona, path.persona_id, form.file)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="Persona not found").model_dump(), 404
+    except ValueError as e:
+        return ErrorData(error=str(e)).model_dump(), 400
+
+
+@bp.delete("/personas/<string:persona_id>/image")
+@jwt_required()
+def delete_persona_image(path: PersonaPath):
+    if not path.persona_id:
+        return ErrorData(error="Persona ID is required").model_dump(), 400
+    try:
+        services.clear_entity_image(Persona, path.persona_id)
+        return "", 200
+    except DoesNotExistError:
+        return ErrorData(error="Persona not found").model_dump(), 404
+
 
 @bp.get("/personas", responses={200: PersonasListResponse})
 @jwt_required()
