@@ -3,6 +3,7 @@ from flask_openapi3 import APIBlueprint
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app import services
+from app.chat_strategies import strategy_display_name
 from app.api_models import (
     AddPersonaBody,
     ChatPath,
@@ -149,6 +150,7 @@ def get_chat(path: ChatPath):
         name=chat.name,
         user_id=chat.user_id,
         strategy_id=chat.strategy_id,
+        strategy_name=strategy_display_name(chat.strategy_id),
         messages=message_list,
     ).model_dump(), 200
 

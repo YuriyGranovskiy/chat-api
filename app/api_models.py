@@ -86,6 +86,7 @@ class GetChatResponseBody(BaseModel):
     name: str
     user_id: str
     strategy_id: str
+    strategy_name: str
     messages: list[dict[str, Any]]
 
 class MessagesQuery(BaseModel):

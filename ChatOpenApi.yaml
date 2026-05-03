@@ -134,6 +134,9 @@ paths:
                           type: string
                         strategy_id:
                           type: string
+                        strategy_name:
+                          type: string
+                          description: Human-readable strategy label
 
   /chats/{chat_id}/messages:
     post:
@@ -235,6 +238,8 @@ paths:
                   name:
                     type: string
                   strategy_id:
+                    type: string
+                  strategy_name:
                     type: string
                   messages:
                     type: array

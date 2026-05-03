@@ -16,6 +16,19 @@ _BY_ID: dict[str, ChatStrategy] = {
 
 KNOWN_STRATEGY_IDS: frozenset[str] = frozenset(_BY_ID.keys())
 
+# Short labels for API clients (list/detail); unknown ids fall back to the id string.
+STRATEGY_DISPLAY_NAMES: dict[str, str] = {
+    _rpg.id: "RPG / Game Master",
+    _language_teacher.id: "Language tutor",
+}
+
+
+def strategy_display_name(strategy_id: str) -> str:
+    key = (strategy_id or "").strip() or "rpg"
+    if key in STRATEGY_DISPLAY_NAMES:
+        return STRATEGY_DISPLAY_NAMES[key]
+    return key.replace("_", " ").title()
+
 
 class ChatStrategy(Protocol):
     id: str

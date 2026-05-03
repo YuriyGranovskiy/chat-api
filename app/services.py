@@ -14,7 +14,7 @@ from app.assistant_message_parse import (
     assistant_display_for_client,
     split_assistant_content,
 )
-from app.chat_strategies import validate_strategy_id_for_create
+from app.chat_strategies import strategy_display_name, validate_strategy_id_for_create
 from app.models import (
     Chat,
     DoesNotExistError,
@@ -57,6 +57,7 @@ def get_user_chats(user_id: str) -> list[dict[str, str]]:
             "user_id": chat.user_id,
             "name": chat.name,
             "strategy_id": chat.strategy_id,
+            "strategy_name": strategy_display_name(chat.strategy_id),
         }
         for chat in chats
     ]
