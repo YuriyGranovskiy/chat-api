@@ -1,15 +1,6 @@
 import logging
 import os
 
-from flask_openapi3 import OpenAPI, Info
-from flask_cors import CORS
-from flask_socketio import SocketIO
-
-from app.config import Config
-from app.extensions import db, bcrypt, jwt
-from app.message_job import process_messages
-from app.sockets import register_socket_handlers
-
 log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "log")
 os.makedirs(log_dir, exist_ok=True)
 
@@ -17,6 +8,15 @@ logger = logging.getLogger(__name__)
 
 
 def create_app():
+    from flask_cors import CORS
+    from flask_openapi3 import Info, OpenAPI
+    from flask_socketio import SocketIO
+
+    from app.config import Config
+    from app.extensions import bcrypt, db, jwt
+    from app.message_job import process_messages
+    from app.sockets import register_socket_handlers
+
     def process_messages_background_task():
         logger.info("Background task started")
         while True:
@@ -39,7 +39,7 @@ def create_app():
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    
+
     from app.routes import bp as api_blueprint
 
     app.register_api(api_blueprint, url_prefix="/api")

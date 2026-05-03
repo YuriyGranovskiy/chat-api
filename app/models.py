@@ -66,6 +66,12 @@ class Chat(db.Model):
     id = db.Column(db.String(28), primary_key=True, default=_new_ulid)
     user_id = db.Column(db.String(28), db.ForeignKey("user.id"))
     name = db.Column(db.String(64), nullable=False)
+    strategy_id = db.Column(
+        db.String(64),
+        nullable=False,
+        default="rpg",
+        server_default="rpg",
+    )
     profile_id = db.Column(db.String(28), db.ForeignKey("user_profile.id"))
     personas = db.relationship("Persona", secondary=chat_personas, backref="chats")
     available_locations = db.relationship("Location", secondary=chat_locations)

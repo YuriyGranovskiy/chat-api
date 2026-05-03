@@ -27,3 +27,6 @@ instance/
 # Ignore logs
 log/
 .aider*
+
+# Ignore venv
+.venv/

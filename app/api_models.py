@@ -64,6 +64,7 @@ class CreateChatBody(BaseModel):
     name: str
     world_id: str | None = None
     profile_id: str
+    strategy_id: str = "rpg"
     persona_ids: list[str] = Field(default_factory=list)
     location_ids: list[str] = Field(default_factory=list)
     initial: str | None = None
@@ -84,6 +85,7 @@ class GetChatResponseBody(BaseModel):
     id: str
     name: str
     user_id: str
+    strategy_id: str
     messages: list[dict[str, Any]]
 
 class MessagesQuery(BaseModel):

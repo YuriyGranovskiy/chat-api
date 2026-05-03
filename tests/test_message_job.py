@@ -32,8 +32,10 @@ class ProcessMessagesLocationTests(unittest.TestCase):
         db.drop_all()
         self.app_context.pop()
 
-    def _create_chat_with_pending_user_message(self) -> Chat:
-        chat = Chat(id="chat_1", name="test chat")
+    def _create_chat_with_pending_user_message(
+        self, *, strategy_id: str = "rpg"
+    ) -> Chat:
+        chat = Chat(id="chat_1", name="test chat", strategy_id=strategy_id)
         db.session.add(chat)
         db.session.add(
             Message(
@@ -169,6 +171,26 @@ class ProcessMessagesLocationTests(unittest.TestCase):
         parsed_meta = json.loads(assistant_message.assistant_meta or "{}")
         self.assertEqual(parsed_meta["persons"], ["akira"])
         self.assertNotIn("new_persons", parsed_meta)
+
+    def test_language_teacher_does_not_sync_scene_entities(self) -> None:
+        chat = self._create_chat_with_pending_user_message(strategy_id="language_teacher")
+        socket = _SocketStub()
+        assistant_content = (
+            "Bonjour! Essayez encore.\n\n"
+            '{"location":"Paris","persons":["Marie"],'
+            '"clothing":{},"ammunition":{}}'
+        )
+
+        with (
+            mock.patch("app.message_job.ollama.chat", return_value={"message": {"content": assistant_content}}),
+            mock.patch("app.message_job.count_tokens", return_value=0),
+        ):
+            process_messages(socket)
+
+        self.assertEqual(Location.query.count(), 0)
+        self.assertEqual(Persona.query.count(), 0)
+        assistant_message = Message.query.filter_by(sender_type=MessageType.ASSISTANT).one()
+        self.assertIsNone(assistant_message.assistant_meta)
 
 
 if __name__ == "__main__":

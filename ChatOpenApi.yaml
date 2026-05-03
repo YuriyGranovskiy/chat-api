@@ -84,6 +84,9 @@ paths:
                   type: string
                 name:
                   type: string
+                strategy_id:
+                  type: string
+                  description: Chat mode — rpg (default) or language_teacher
                 initial:
                   type: string
       responses:
@@ -98,6 +101,8 @@ paths:
                     type: string
                   chat_id:
                     type: string
+        400:
+          description: Bad request (e.g. unknown strategy_id)
 
     get:
       summary: Get chats of a user
@@ -126,6 +131,8 @@ paths:
                         user_id:
                           type: string
                         name:
+                          type: string
+                        strategy_id:
                           type: string
 
   /chats/{chat_id}/messages:
@@ -226,6 +233,8 @@ paths:
                   user_id:
                     type: string
                   name:
+                    type: string
+                  strategy_id:
                     type: string
                   messages:
                     type: array

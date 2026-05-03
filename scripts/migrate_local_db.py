@@ -60,6 +60,23 @@ def migrate_entity_images(conn: sqlite3.Connection) -> bool:
     return True
 
 
+def migrate_chat_strategy_id(conn: sqlite3.Connection) -> bool:
+    columns = _table_columns(conn, "chat")
+    if not columns:
+        print("Table `chat` not found; skip strategy_id.", file=sys.stderr)
+        return True
+    if "strategy_id" in columns:
+        print("Column chat.strategy_id already exists; nothing to do for strategy.")
+        return True
+    conn.execute(
+        "ALTER TABLE chat ADD COLUMN strategy_id VARCHAR(64) NOT NULL DEFAULT 'rpg'"
+    )
+    conn.execute("UPDATE chat SET strategy_id = 'rpg' WHERE strategy_id IS NULL OR strategy_id = ''")
+    conn.commit()
+    print("Migration applied: chat.strategy_id (VARCHAR(64), NOT NULL, default 'rpg').")
+    return True
+
+
 def migrate_assistant_meta(conn: sqlite3.Connection) -> bool:
     cur = conn.execute("PRAGMA table_info(message)")
     columns = [row[1] for row in cur.fetchall()]
@@ -93,6 +110,7 @@ def main() -> int:
     conn = sqlite3.connect(db_path)
     try:
         migrate_assistant_meta(conn)
+        migrate_chat_strategy_id(conn)
         migrate_entity_images(conn)
     finally:
         conn.close()

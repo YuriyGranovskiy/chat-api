@@ -14,6 +14,7 @@ from app.assistant_message_parse import (
     assistant_display_for_client,
     split_assistant_content,
 )
+from app.chat_strategies import validate_strategy_id_for_create
 from app.models import (
     Chat,
     DoesNotExistError,
@@ -50,7 +51,15 @@ def login_user(username: str, password: str) -> str | None:
 
 def get_user_chats(user_id: str) -> list[dict[str, str]]:
     chats = Chat.query.filter_by(user_id=user_id).all()
-    return [{"id": chat.id, "user_id": chat.user_id, "name": chat.name} for chat in chats]
+    return [
+        {
+            "id": chat.id,
+            "user_id": chat.user_id,
+            "name": chat.name,
+            "strategy_id": chat.strategy_id,
+        }
+        for chat in chats
+    ]
 
 
 def message_text_for_client(message: Message) -> str:
@@ -326,12 +335,15 @@ def create_user_chat(
     profile_id: str | None = None,
     persona_ids: list[str] | None = None,
     location_ids: list[str] | None = None,
+    strategy_id: str = "rpg",
 ) -> str:
+    resolved_strategy = validate_strategy_id_for_create(strategy_id)
     new_chat = Chat(
         user_id=user_id,
         name=name,
         world_id=world_id,
         profile_id=profile_id,
+        strategy_id=resolved_strategy,
     )
 
     if persona_ids:

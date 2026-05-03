@@ -75,14 +75,18 @@ def login(body: LoginBody) -> TokenResponse:
 def create_chat(body: CreateChatBody):
     current_user_id = get_jwt_identity()
     
-    chat_id = services.create_user_chat(
-        user_id=current_user_id,
-        name=body.name,
-        world_id=body.world_id,
-        profile_id=body.profile_id,
-        persona_ids=body.persona_ids,
-        location_ids=body.location_ids
-    )
+    try:
+        chat_id = services.create_user_chat(
+            user_id=current_user_id,
+            name=body.name,
+            world_id=body.world_id,
+            profile_id=body.profile_id,
+            persona_ids=body.persona_ids,
+            location_ids=body.location_ids,
+            strategy_id=body.strategy_id,
+        )
+    except ValueError as error:
+        return ErrorData(error=str(error)).model_dump(), 400
     
     if body.initial:
         services.create_message(chat_id, body.initial, MessageType.ASSISTANT)
@@ -144,6 +148,7 @@ def get_chat(path: ChatPath):
         id=chat.id,
         name=chat.name,
         user_id=chat.user_id,
+        strategy_id=chat.strategy_id,
         messages=message_list,
     ).model_dump(), 200
 
