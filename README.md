@@ -35,7 +35,17 @@ Model weights are downloaded on first use (Hugging Face cache, typically under `
 
 ### HTTP API (from the UI)
 
-- `POST /api/chats/{chat_id}/transcriptions` — `multipart/form-data` with field **`audio`** (file) and optional **`language`**. Requires JWT and membership in the chat. Response: `{"text":"..."}`.
+- `POST /api/chats/{chat_id}/transcriptions` — `multipart/form-data` with field **`audio`** (file) and optional **`language`** (overrides the chat default). If omitted, the chat's **`language`** is sent to the transcription service. Response: `{"text":"..."}`.
 
 If `WHISPER_TRANSCRIPTION_URL` is unset, the transcribe endpoint returns **502** with a clear error; the rest of the API keeps running.
 
+
+## Chat speech language
+
+Each chat has a **`language`** field (ISO 639-1 style, e.g. `en`, `ru`). It is used as the default hint for **`POST /api/chats/{id}/transcriptions`** when the multipart form does not include `language`.
+
+- **`POST /api/chats`** — optional JSON field **`language`** (default **`en`**). Invalid values fall back to `en`.
+- **`GET /api/chats`** — each item includes **`language`**.
+- **`GET /api/chats/{id}`** — response includes **`language`**.
+
+Run `python3 scripts/migrate_local_db.py` on existing SQLite DBs to add `chat.language` (existing rows get `en`).

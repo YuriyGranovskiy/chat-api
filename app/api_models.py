@@ -76,6 +76,7 @@ class CreateChatBody(BaseModel):
     persona_ids: list[str] = Field(default_factory=list)
     location_ids: list[str] = Field(default_factory=list)
     initial: str | None = None
+    language: str = "en"
 
 class AddPersonaBody(BaseModel):
     persona_id: str
@@ -95,6 +96,7 @@ class GetChatResponseBody(BaseModel):
     user_id: str
     strategy_id: str
     strategy_name: str
+    language: str
     messages: list[dict[str, Any]]
 
 class MessagesQuery(BaseModel):

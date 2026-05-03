@@ -77,6 +77,13 @@ class Chat(db.Model):
     available_locations = db.relationship("Location", secondary=chat_locations)
     world_id = db.Column(db.String(28), db.ForeignKey("world.id"))
     scenario = db.Column(db.Text, nullable=True)
+    # ISO 639-1 (or BCP47 prefix) for speech recognition; default English for new chats.
+    language = db.Column(
+        db.String(16),
+        nullable=False,
+        default="en",
+        server_default="en",
+    )
     messages = db.relationship("Message", backref="chat", lazy=True)
 
     def __repr__(self) -> str:

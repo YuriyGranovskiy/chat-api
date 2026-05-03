@@ -60,6 +60,23 @@ def migrate_entity_images(conn: sqlite3.Connection) -> bool:
     return True
 
 
+
+def migrate_chat_language(conn: sqlite3.Connection) -> bool:
+    columns = _table_columns(conn, "chat")
+    if not columns:
+        print("Table `chat` not found; skip language.", file=sys.stderr)
+        return True
+    if "language" in columns:
+        print("Column chat.language already exists; nothing to do for language.")
+        return True
+    conn.execute(
+        "ALTER TABLE chat ADD COLUMN language VARCHAR(16) NOT NULL DEFAULT 'en'"
+    )
+    conn.execute("UPDATE chat SET language = 'en' WHERE language IS NULL OR language = ''")
+    conn.commit()
+    print("Migration applied: chat.language (VARCHAR(16), NOT NULL, default 'en').")
+    return True
+
 def migrate_chat_strategy_id(conn: sqlite3.Connection) -> bool:
     columns = _table_columns(conn, "chat")
     if not columns:
@@ -110,6 +127,7 @@ def main() -> int:
     conn = sqlite3.connect(db_path)
     try:
         migrate_assistant_meta(conn)
+        migrate_chat_language(conn)
         migrate_chat_strategy_id(conn)
         migrate_entity_images(conn)
     finally:

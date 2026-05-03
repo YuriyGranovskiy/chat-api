@@ -88,6 +88,7 @@ def create_chat(body: CreateChatBody):
             persona_ids=body.persona_ids,
             location_ids=body.location_ids,
             strategy_id=body.strategy_id,
+            language=body.language,
         )
     except ValueError as error:
         return ErrorData(error=str(error)).model_dump(), 400
@@ -137,6 +138,8 @@ def transcribe_chat_audio(path: ChatPath, form: AudioTranscriptionForm):
         return ErrorData(error=str(exc)).model_dump(), 400
 
     lang = (form.language or "").strip() or None
+    if not lang:
+        lang = getattr(chat, "language", None) or "en"
     try:
         text = whisper_client.transcribe_audio(
             audio_bytes,
@@ -188,6 +191,7 @@ def get_chat(path: ChatPath):
         user_id=chat.user_id,
         strategy_id=chat.strategy_id,
         strategy_name=strategy_display_name(chat.strategy_id),
+        language=getattr(chat, "language", None) or "en",
         messages=message_list,
     ).model_dump(), 200
 

@@ -58,6 +58,7 @@ def get_user_chats(user_id: str) -> list[dict[str, str]]:
             "name": chat.name,
             "strategy_id": chat.strategy_id,
             "strategy_name": strategy_display_name(chat.strategy_id),
+            "language": getattr(chat, "language", None) or "en",
         }
         for chat in chats
     ]
@@ -329,6 +330,15 @@ def delete_entity(model: type[ModelT], entity_id: str) -> None:
     db.session.commit()
 
 
+def _normalize_chat_language(language: str | None) -> str:
+    raw = (language or "en").strip().lower()
+    if not raw or len(raw) > 16:
+        return "en"
+    if not all(c.isalnum() or c in "-_" for c in raw):
+        return "en"
+    return raw
+
+
 def create_user_chat(
     user_id: str,
     name: str,
@@ -337,6 +347,7 @@ def create_user_chat(
     persona_ids: list[str] | None = None,
     location_ids: list[str] | None = None,
     strategy_id: str = "rpg",
+    language: str | None = None,
 ) -> str:
     resolved_strategy = validate_strategy_id_for_create(strategy_id)
     new_chat = Chat(
@@ -345,6 +356,7 @@ def create_user_chat(
         world_id=world_id,
         profile_id=profile_id,
         strategy_id=resolved_strategy,
+        language=_normalize_chat_language(language),
     )
 
     if persona_ids:
