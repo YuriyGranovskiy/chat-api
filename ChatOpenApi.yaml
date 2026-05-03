@@ -213,6 +213,55 @@ paths:
                         sender_type:
                          type: string
 
+  /chats/{chat_id}/transcriptions:
+    post:
+      summary: Transcribe speech audio for chat input
+      description: >-
+        Uploads audio (multipart). Returns recognized text for the client to put in the message field.
+        Requires the same authentication as other /chats routes. Proxies to local whisper_service.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio blob (e.g. webm from MediaRecorder)
+                language:
+                  type: string
+                  description: Optional ISO 639-1 language hint (e.g. ru)
+      responses:
+        200:
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - text
+                properties:
+                  text:
+                    type: string
+        400:
+          description: Invalid or unsupported audio
+        403:
+          description: User is not allowed in this chat
+        404:
+          description: Chat not found
+        502:
+          description: Transcription service unavailable or misconfigured
+
   /chats/{chat_id}:
     get:
       summary: Get a chat

@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 
@@ -21,3 +22,25 @@ class Config:
         "image/webp": ".webp",
         "image/gif": ".gif",
     }
+
+    # Speech transcription (proxy to whisper_service). Empty URL → 502 on transcribe only.
+    WHISPER_TRANSCRIPTION_URL = os.environ.get("WHISPER_TRANSCRIPTION_URL", "").strip()
+    WHISPER_HTTP_TIMEOUT_SEC = float(os.environ.get("WHISPER_HTTP_TIMEOUT_SEC", "120"))
+    WHISPER_API_KEY = os.environ.get("WHISPER_API_KEY", "").strip() or None
+
+    MAX_AUDIO_BYTES = int(os.environ.get("MAX_AUDIO_BYTES", str(25 * 1024 * 1024)))
+    ALLOWED_AUDIO_MIMES = frozenset(
+        {
+            "audio/webm",
+            "video/webm",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/wave",
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/ogg",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/flac",
+        }
+    )

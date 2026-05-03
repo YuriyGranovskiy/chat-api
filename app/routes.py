@@ -3,9 +3,11 @@ from flask_openapi3 import APIBlueprint
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app import services
+from app import whisper_client
 from app.chat_strategies import strategy_display_name
 from app.api_models import (
     AddPersonaBody,
+    AudioTranscriptionForm,
     ChatPath,
     ChatsResponseBody,
     CreateChatBody,
@@ -29,6 +31,7 @@ from app.api_models import (
     ProfilesListResponse,
     RegisterBody,
     TokenResponse,
+    TranscriptionResponse,
     WorldBody,
     WorldPath,
     WorldsListResponse,
@@ -106,11 +109,45 @@ def add_persona_to_existing_chat(path: ChatPath, body: AddPersonaBody):
 @bp.post("/chats/<string:chat_id>/messages")
 @jwt_required()
 def send_message(path: ChatPath, body: CreateMessageBody):
+    current_user_id = get_jwt_identity()
+    chat = Chat.query.get(path.chat_id)
+    if not chat:
+        return ErrorData(error="Chat not found").model_dump(), 404
+    if not services.is_user_in_chat(current_user_id, path.chat_id):
+        return ErrorData(error="User is not in the specified chat").model_dump(), 403
     try:
         services.create_message(path.chat_id, body.message, MessageType.USER)
         return "", 200
     except DoesNotExistError:
-        return ErrorData(error='Chat not found').model_dump(), 404
+        return ErrorData(error="Chat not found").model_dump(), 404
+
+@bp.post("/chats/<string:chat_id>/transcriptions")
+@jwt_required()
+def transcribe_chat_audio(path: ChatPath, form: AudioTranscriptionForm):
+    current_user_id = get_jwt_identity()
+    chat = Chat.query.get(path.chat_id)
+    if not chat:
+        return ErrorData(error="Chat not found").model_dump(), 404
+    if not services.is_user_in_chat(current_user_id, path.chat_id):
+        return ErrorData(error="User is not in the specified chat").model_dump(), 403
+
+    try:
+        audio_bytes, mime, upstream_name = whisper_client.validate_audio_file(form.audio)
+    except ValueError as exc:
+        return ErrorData(error=str(exc)).model_dump(), 400
+
+    lang = (form.language or "").strip() or None
+    try:
+        text = whisper_client.transcribe_audio(
+            audio_bytes,
+            upstream_name,
+            mime,
+            lang,
+        )
+    except whisper_client.WhisperTranscriptionError as exc:
+        return ErrorData(error=exc.message).model_dump(), exc.status_code
+
+    return TranscriptionResponse(text=text).model_dump(), 200
 
 @bp.get("/chats/<string:chat_id>/messages")
 @jwt_required()

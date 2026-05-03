@@ -56,6 +56,14 @@ class MediaPath(BaseModel):
 class EntityImageUploadForm(BaseModel):
     file: FileStorage
 
+class AudioTranscriptionForm(BaseModel):
+    audio: FileStorage
+    language: str | None = None
+
+
+class TranscriptionResponse(BaseModel):
+    text: str
+
 
 class ErrorData(BaseModel):
     error: str
