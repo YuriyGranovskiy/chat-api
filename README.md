@@ -6,30 +6,44 @@ Transcription runs in a **separate process** in [`whisper_service/`](whisper_ser
 
 ### Local development
 
-1. Install sidecar dependencies (prefer a dedicated venv or `pip install -r whisper_service/requirements.txt`).
-2. Start the sidecar on **127.0.0.1:8090** with a **single** uvicorn worker (multiple workers load the model multiple times):
+1. Start the sidecar (creates `whisper_service/.venv`, installs deps, runs a **single** uvicorn worker on **127.0.0.1:8090**):
 
    ```bash
    cd whisper_service
-   uvicorn main:app --host 127.0.0.1 --port 8090
+   ./start.sh
    ```
 
-3. Point the API at the sidecar:
+   Optional: `WHISPER_HOST`, `WHISPER_PORT` (default `8090`), `WHISPER_VENV` (default `./.venv` in that folder). **GPU + missing cuBLAS:** if you see `Library libcublas.so.12 is not found`, install CUDA 12 user-space libs into the same venv, then restart:
+
+   ```bash
+   cd whisper_service
+   WHISPER_CUDA_PIP=1 ./start.sh
+   ```
+
+   (Same as: `.venv/bin/pip install -r whisper_service/requirements-cuda12.txt`.) If it still fails, install the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) matching your driver, or force CPU: `WHISPER_DEVICE=cpu ./start.sh`.
+
+   For a fully manual venv, use `pip install -r whisper_service/requirements.txt` and `uvicorn main:app --host 127.0.0.1 --port 8090`.
+
+2. Point the API at the sidecar:
 
    ```bash
    export WHISPER_TRANSCRIPTION_URL=http://127.0.0.1:8090/v1/audio/transcriptions
    ```
 
-4. Run the Flask app as you usually do.
+3. Run the Flask app as you usually do.
 
 Optional sidecar environment variables:
 
 | Variable | Meaning |
 |----------|---------|
 | `WHISPER_MODEL` | faster-whisper model id (default `small`) |
-| `WHISPER_DEVICE` | `cpu` or `cuda` (default `cpu`) |
-| `WHISPER_COMPUTE_TYPE` | e.g. `int8`, `float16` (default `int8` on CPU) |
+| `WHISPER_DEVICE` | Empty = **auto**: `cuda` if [CTranslate2](https://opennmt.net/CTranslate2/installation.html) sees a GPU, else `cpu`. Set `cuda` or `cpu` to force. |
+| `WHISPER_COMPUTE_TYPE` | Empty = **auto**: `float16` on GPU, `int8` on CPU. Override e.g. `int8_float16` on GPU if you tune VRAM. |
 | `MAX_AUDIO_BYTES` | Max upload size for the sidecar (default 25 MiB) |
+
+**GPU still slow or log shows `device='cpu'`?** The PyPI `ctranslate2` wheel must match your CUDA drivers (see CTranslate2 “Install with GPU support”). Install the suggested NVIDIA packages, then reinstall `faster-whisper` / `ctranslate2` in `whisper_service/.venv`, or set explicitly:
+
+`WHISPER_DEVICE=cuda WHISPER_COMPUTE_TYPE=float16 ./start.sh`
 
 Model weights are downloaded on first use (Hugging Face cache, typically under `~/.cache/huggingface`). To keep caches outside the repo, leave defaults; if you set `HF_HOME` or similar **inside** the repo tree, add that path to `.gitignore` (`.cache/` is already ignored for common layouts).
 

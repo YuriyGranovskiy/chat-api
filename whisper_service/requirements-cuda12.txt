@@ -1,0 +1,8 @@
+# CUDA 12 runtime libs for CTranslate2 / faster-whisper (libcublas.so.12, etc.).
+# Install into the same venv as whisper_service, e.g.:
+#   .venv/bin/pip install -r requirements-cuda12.txt
+# or:  WHISPER_CUDA_PIP=1 ./start.sh
+nvidia-cublas-cu12>=12.3.3
+nvidia-cudnn-cu12>=9.1.0
+nvidia-cudnn-cu11>=8.9.6.50
+
