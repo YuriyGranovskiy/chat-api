@@ -20,6 +20,26 @@ logger = logging.getLogger(__name__)
 session_by_sid: dict[str, str] = {}
 
 
+def emit_user_message_created(
+    socketio_app,
+    chat_id: str,
+    user_id: str,
+    message_id: str,
+    message_content: str,
+) -> None:
+    """Same payload as the ``send_message`` handler (user text + assistant job via ``Status.NEW``)."""
+    socketio_app.emit(
+        "new_message",
+        {
+            "id": str(message_id),
+            "sender_type": "user",
+            "sender_id": user_id,
+            "message": message_content,
+        },
+        room=chat_id,
+    )
+
+
 def register_socket_handlers(socketio_app):
     def authenticated_only(f):
         @functools.wraps(f)
@@ -105,14 +125,9 @@ def register_socket_handlers(socketio_app):
             return emit("error", {"message": "Access denied"})
 
         message_id = create_message(chat_id, message_content, sender_type=MessageType.USER)
-
-        message_data = {
-            "id": str(message_id),
-            "sender_type": "user",
-            "sender_id": user_id,
-            "message": message_content,
-        }
-        socketio_app.emit("new_message", message_data, room=chat_id)
+        emit_user_message_created(
+            socketio_app, chat_id, user_id, message_id, message_content
+        )
 
     @socketio_app.on("delete_message")
     @authenticated_only

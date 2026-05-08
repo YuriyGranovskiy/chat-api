@@ -49,7 +49,7 @@ Model weights are downloaded on first use (Hugging Face cache, typically under `
 
 ### HTTP API (from the UI)
 
-- `POST /api/chats/{chat_id}/transcriptions` — `multipart/form-data` with field **`audio`** (file) and optional **`language`** (overrides the chat default). If omitted, the chat's **`language`** is sent to the transcription service. Response: `{"text":"..."}`.
+- `POST /api/chats/{chat_id}/transcriptions` — `multipart/form-data` with field **`audio`** (file) and optional **`language`** (overrides the chat default). If omitted, the chat's **`language`** is sent to the transcription service. Response: `{"text":"..."}` (leading/trailing whitespace trimmed). Non-empty results are saved as a **user** message and broadcast on the **`new_message`** WebSocket exactly like **`send_message`**, so the client does not need `POST /messages`; the assistant reply is still produced by the background worker and emitted as usual.
 
 If `WHISPER_TRANSCRIPTION_URL` is unset, the transcribe endpoint returns **502** with a clear error; the rest of the API keeps running.
 

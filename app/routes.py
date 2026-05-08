@@ -1,9 +1,10 @@
-from flask import send_file
+from flask import current_app, send_file
 from flask_openapi3 import APIBlueprint
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app import services
 from app import whisper_client
+from app.sockets import emit_user_message_created
 from app.chat_strategies import strategy_display_name
 from app.api_models import (
     AddPersonaBody,
@@ -150,7 +151,21 @@ def transcribe_chat_audio(path: ChatPath, form: AudioTranscriptionForm):
     except whisper_client.WhisperTranscriptionError as exc:
         return ErrorData(error=exc.message).model_dump(), exc.status_code
 
-    return TranscriptionResponse(text=text).model_dump(), 200
+    trimmed = text.strip()
+    if trimmed:
+        try:
+            message_id = services.create_message(
+                path.chat_id, trimmed, MessageType.USER
+            )
+        except DoesNotExistError:
+            return ErrorData(error="Chat not found").model_dump(), 404
+        socketio = current_app.extensions.get("socketio")
+        if socketio:
+            emit_user_message_created(
+                socketio, path.chat_id, current_user_id, message_id, trimmed
+            )
+
+    return TranscriptionResponse(text=trimmed).model_dump(), 200
 
 @bp.get("/chats/<string:chat_id>/messages")
 @jwt_required()

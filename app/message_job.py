@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 import ollama
-from sqlalchemy import asc
+from sqlalchemy import asc, update
 import ulid
 
 from app.assistant_message_parse import (
@@ -76,16 +76,21 @@ def process_messages(socketio_app: Any) -> None:
     )
 
     for chat in chats:
+        chat_id = chat.id
         strategy = get_strategy(chat.strategy_id)
         messages = _messages_for_model(chat)
         pending_user_messages = Message.query.filter_by(
-            chat_id=chat.id,
+            chat_id=chat_id,
             sender_type=MessageType.USER,
             status=Status.NEW,
         ).all()
 
+        pending_ids = [m.id for m in pending_user_messages]
+        if not pending_ids:
+            continue
+
         try:
-            logger.info("Processing chat %s with %s messages", chat.id, len(messages))
+            logger.info("Processing chat %s with %s messages", chat_id, len(messages))
             result = ollama.chat(
                 model="ministral-3:8b",
                 messages=messages,
@@ -97,15 +102,23 @@ def process_messages(socketio_app: Any) -> None:
             processed_message_id = _new_ulid()
             assistant_message = Message(
                 id=processed_message_id,
-                chat_id=chat.id,
+                chat_id=chat_id,
                 sender_type=MessageType.ASSISTANT,
                 message=display_text,
                 assistant_meta=meta,
                 status=Status.PROCESSED,
             )
             db.session.add(assistant_message)
-            for pending_message in pending_user_messages:
-                pending_message.status = Status.PROCESSED
+            db.session.execute(
+                update(Message)
+                .where(
+                    Message.id.in_(pending_ids),
+                    Message.chat_id == chat_id,
+                    Message.sender_type == MessageType.USER,
+                    Message.status == Status.NEW,
+                )
+                .values(status=Status.PROCESSED),
+            )
 
             db.session.commit()
             socketio_app.emit(
@@ -116,16 +129,17 @@ def process_messages(socketio_app: Any) -> None:
                     "sender_type": "assistant",
                     "assistant_meta": meta,
                 },
-                room=chat.id,
+                room=chat_id,
                 include_self=True,
             )
             logger.info(
                 "Chat %s processed successfully. Tokens sent: %s",
-                chat.id,
+                chat_id,
                 count_tokens(messages),
             )
         except Exception:
-            logger.exception("Failed to process chat %s", chat.id)
+            db.session.rollback()
+            logger.exception("Failed to process chat %s", chat_id)
 
 
 def count_tokens(messages: list[dict[str, str]]) -> int:

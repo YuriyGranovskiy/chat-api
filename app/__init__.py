@@ -28,6 +28,7 @@ def create_app():
     app = OpenAPI(__name__, info=info)
     CORS(app)
     socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
+    app.extensions["socketio"] = socketio
     config = Config()
     app.config.from_object(config)
 

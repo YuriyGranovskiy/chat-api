@@ -24,7 +24,7 @@ class Config:
     }
 
     # Speech transcription (proxy to whisper_service). Empty URL → 502 on transcribe only.
-    WHISPER_TRANSCRIPTION_URL = os.environ.get("WHISPER_TRANSCRIPTION_URL", "").strip()
+    WHISPER_TRANSCRIPTION_URL = "http://localhost:8090/v1/audio/transcriptions" # os.environ.get("WHISPER_TRANSCRIPTION_URL", "").strip()
     WHISPER_HTTP_TIMEOUT_SEC = float(os.environ.get("WHISPER_HTTP_TIMEOUT_SEC", "120"))
     WHISPER_API_KEY = os.environ.get("WHISPER_API_KEY", "").strip() or None
 
