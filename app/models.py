@@ -5,7 +5,14 @@ from app.extensions import bcrypt, db
 
 
 def _new_ulid() -> str:
-    return str(ulid.new())
+    """Support both APIs: some wheels expose ulid.new(), others only ULID()."""
+    new_fn = getattr(ulid, "new", None)
+    if callable(new_fn):
+        return str(new_fn())
+    cls = getattr(ulid, "ULID", None)
+    if cls is not None:
+        return str(cls())
+    raise RuntimeError("No compatible ULID implementation (install python-ulid or ulid-py)")
 
 
 def get_ulid() -> str:
@@ -98,6 +105,9 @@ class Message(db.Model):
     # Existing DBs: ALTER TABLE message ADD COLUMN assistant_meta TEXT;
     assistant_meta = db.Column(db.Text, nullable=True)
     status = db.Column(db.Enum(Status), default=Status.NEW, server_default=Status.NEW.name)
+    # Cached synthesized speech for assistant rows; paths relative to MEDIA_ROOT.
+    assistant_speech_path = db.Column(db.String(512), nullable=True)
+    assistant_speech_mime = db.Column(db.String(64), nullable=True)
 
 
 class UserProfile(db.Model):

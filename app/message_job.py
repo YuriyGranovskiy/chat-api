@@ -7,7 +7,6 @@ from typing import Any
 
 import ollama
 from sqlalchemy import asc, update
-import ulid
 
 from app.assistant_message_parse import (
     assistant_raw_for_model,
@@ -15,7 +14,7 @@ from app.assistant_message_parse import (
 )
 from app.chat_strategies import get_strategy
 from app.logging_config import get_logging_config
-from app.models import Chat, Message, MessageType, Status, db
+from app.models import Chat, Message, MessageType, Status, db, get_ulid
 
 logging.config.dictConfig(get_logging_config())
 logger = logging.getLogger(__name__)
@@ -36,10 +35,6 @@ def _tokenizer() -> Any:
         "hf-internal-testing/llama-tokenizer",
         local_files_only=True,
     )
-
-
-def _new_ulid() -> str:
-    return str(ulid.new())
 
 
 def _messages_for_model(chat: Chat) -> list[dict[str, str]]:
@@ -99,7 +94,7 @@ def process_messages(socketio_app: Any) -> None:
             content = result["message"]["content"]
             display_text, meta = split_assistant_content(content)
             display_text, meta = strategy.refine_assistant_output(chat, display_text, meta)
-            processed_message_id = _new_ulid()
+            processed_message_id = get_ulid()
             assistant_message = Message(
                 id=processed_message_id,
                 chat_id=chat_id,
@@ -128,6 +123,7 @@ def process_messages(socketio_app: Any) -> None:
                     "message": display_text,
                     "sender_type": "assistant",
                     "assistant_meta": meta,
+                    "has_speech": False,
                 },
                 room=chat_id,
                 include_self=True,

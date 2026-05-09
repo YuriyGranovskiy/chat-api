@@ -1,0 +1,4 @@
+# Coqui XTTS v2 pulls torch and friends; GPU wheels depend on your platform.
+fastapi>=0.100
+uvicorn[standard]>=0.22
+TTS>=0.21.3

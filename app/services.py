@@ -4,7 +4,6 @@ import os
 import secrets
 from typing import Any, TypeVar
 
-import ulid
 from flask import current_app
 from flask_jwt_extended import create_access_token
 from sqlalchemy import desc
@@ -26,6 +25,7 @@ from app.models import (
     User,
     World,
     db,
+    get_ulid,
 )
 
 ModelT = TypeVar("ModelT")
@@ -70,6 +70,62 @@ def message_text_for_client(message: Message) -> str:
     return message.message
 
 
+def assistant_message_has_speech(message: Message) -> bool:
+    return (
+        message.sender_type == MessageType.ASSISTANT and bool(message.assistant_speech_path)
+    )
+
+
+def purge_assistant_speech_disk(message: Message) -> None:
+    """Delete cached speech file if `assistant_speech_path` is set."""
+    path = getattr(message, "assistant_speech_path", None)
+    if not path:
+        return
+    root: str = current_app.config["MEDIA_ROOT"]
+    _safe_unlink(os.path.join(root, path))
+
+
+def resolve_assistant_speech_file(message: Message) -> tuple[str, str] | None:
+    """Return `(absolute_path, mime)` if cached speech exists on disk."""
+    if message.sender_type != MessageType.ASSISTANT or not message.assistant_speech_path:
+        return None
+    root: str = current_app.config["MEDIA_ROOT"]
+    abs_path = os.path.join(root, message.assistant_speech_path)
+    if not os.path.isfile(abs_path):
+        return None
+    mime = (message.assistant_speech_mime or "audio/wav").split(";")[0].strip()
+    return abs_path, mime
+
+
+def persist_assistant_speech(message: Message, audio_bytes: bytes, mime_hint: str) -> None:
+    """Write audio under MEDIA_ROOT and set message speech columns."""
+    if message.sender_type != MessageType.ASSISTANT:
+        raise DoesNotExistError
+
+    purge_assistant_speech_disk(message)
+    media_root: str = current_app.config["MEDIA_ROOT"]
+    rel_dir = os.path.join("tts", message.chat_id)
+    dir_abs = os.path.join(media_root, rel_dir)
+    os.makedirs(dir_abs, exist_ok=True)
+
+    normalized_mime = (mime_hint or "audio/wav").split(";")[0].strip().lower() or "audio/wav"
+    if "mpeg" in normalized_mime or normalized_mime == "audio/mp3":
+        ext = ".mp3"
+    elif "ogg" in normalized_mime:
+        ext = ".ogg"
+    else:
+        ext = ".wav"
+
+    rel_path = os.path.join(rel_dir, f"{message.id}{ext}")
+    abs_path = os.path.join(media_root, rel_path)
+    with open(abs_path, "wb") as fh:
+        fh.write(audio_bytes)
+
+    message.assistant_speech_path = rel_path.replace("\\", "/")
+    message.assistant_speech_mime = normalized_mime
+    db.session.commit()
+
+
 def create_message(chat_id: str, message: str, sender_type: MessageType) -> str:
     chat = Chat.query.get(chat_id)
     if not chat:
@@ -81,7 +137,7 @@ def create_message(chat_id: str, message: str, sender_type: MessageType) -> str:
         body, assistant_meta = split_assistant_content(message)
 
     new_message = Message(
-        id=str(ulid.new()),
+        id=get_ulid(),
         chat_id=chat_id,
         sender_type=sender_type,
         message=body,
@@ -112,6 +168,7 @@ def get_messages(
             "message": message_text_for_client(message),
             "sender_type": message.sender_type.name.lower(),
             "assistant_meta": message.assistant_meta,
+            "has_speech": assistant_message_has_speech(message),
         }
         for message in messages
     ]
@@ -127,6 +184,7 @@ def delete_chat(chat_id: str) -> None:
         raise DoesNotExistError
 
     for message in Message.query.filter_by(chat_id=chat_id).all():
+        purge_assistant_speech_disk(message)
         db.session.delete(message)
     db.session.delete(chat)
     db.session.commit()
@@ -136,6 +194,7 @@ def delete_message(message_id: str) -> None:
     message = Message.query.get(message_id)
     if not message:
         raise DoesNotExistError
+    purge_assistant_speech_disk(message)
     db.session.delete(message)
     db.session.commit()
 
@@ -160,6 +219,7 @@ def regenerate_message(message_id: str) -> tuple[list[str], str]:
     messages_to_delete = messages[index:]
     deleted_ids = [item.id for item in messages_to_delete]
     for item in messages_to_delete:
+        purge_assistant_speech_disk(item)
         db.session.delete(item)
 
     previous_user_message.status = Status.NEW
@@ -172,6 +232,9 @@ def edit_message(message_id: str, new_text: str) -> str:
     if not message:
         raise DoesNotExistError
     if message.sender_type == MessageType.ASSISTANT:
+        purge_assistant_speech_disk(message)
+        message.assistant_speech_path = None
+        message.assistant_speech_mime = None
         body, assistant_meta = split_assistant_content(new_text)
         message.message = body
         message.assistant_meta = assistant_meta

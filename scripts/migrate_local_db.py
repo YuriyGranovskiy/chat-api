@@ -109,6 +109,31 @@ def migrate_assistant_meta(conn: sqlite3.Connection) -> bool:
     return True
 
 
+def migrate_message_assistant_speech(conn: sqlite3.Connection) -> bool:
+    cur = conn.execute("PRAGMA table_info(message)")
+    columns = [row[1] for row in cur.fetchall()]
+    if not columns:
+        print(
+            "Table `message` not found; skip assistant speech columns.",
+            file=sys.stderr,
+        )
+        return False
+    changed = False
+    if "assistant_speech_path" not in columns:
+        conn.execute("ALTER TABLE message ADD COLUMN assistant_speech_path VARCHAR(512)")
+        changed = True
+        print("Migration applied: message.assistant_speech_path (nullable).")
+    if "assistant_speech_mime" not in columns:
+        conn.execute("ALTER TABLE message ADD COLUMN assistant_speech_mime VARCHAR(64)")
+        changed = True
+        print("Migration applied: message.assistant_speech_mime (nullable).")
+    if changed:
+        conn.commit()
+    elif "assistant_speech_path" in columns and "assistant_speech_mime" in columns:
+        print("Assistant speech columns already present; nothing to do for speech.")
+    return True
+
+
 def main() -> int:
     env_db_path = os.environ.get("CHAT_DB_PATH")
     if env_db_path:
@@ -127,6 +152,7 @@ def main() -> int:
     conn = sqlite3.connect(db_path)
     try:
         migrate_assistant_meta(conn)
+        migrate_message_assistant_speech(conn)
         migrate_chat_language(conn)
         migrate_chat_strategy_id(conn)
         migrate_entity_images(conn)

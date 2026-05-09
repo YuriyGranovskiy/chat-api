@@ -210,8 +210,13 @@ paths:
                           type: string
                         message:
                           type: string
+                        assistant_meta:
+                          type: string
+                          nullable: true
                         sender_type:
-                         type: string
+                          type: string
+                        has_speech:
+                          type: boolean
 
   /chats/{chat_id}/transcriptions:
     post:
@@ -264,6 +269,70 @@ paths:
         502:
           description: Transcription service unavailable or misconfigured
 
+  /chats/{chat_id}/messages/{message_id}/speech:
+    post:
+      summary: Synthesize or return cached assistant message speech (XTTS)
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional language override (otherwise chat.language)
+      responses:
+        "200":
+          description: WAV audio payload; header X-Cached-Speech=1 when file was reused
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Message is not an assistant message or invalid synthesis request
+        "403":
+          description: Forbidden
+        "404":
+          description: Chat or message not found
+        "502":
+          description: TTS misconfigured or sidecar unreachable
+        "504":
+          description: TTS upstream timeout or error
+
+    get:
+      summary: Get stored speech WAV for assistant message
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cached WAV audio
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found / no cached speech yet
   /chats/{chat_id}:
     get:
       summary: Get a chat
@@ -303,3 +372,11 @@ paths:
                           type: string
                         message:
                           type: string
+                        assistant_meta:
+                          type: string
+                          nullable: true
+                        sender_type:
+                          type: string
+                        has_speech:
+                          type: boolean
+

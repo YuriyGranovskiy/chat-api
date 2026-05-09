@@ -36,6 +36,16 @@ class CreatedBody(BaseModel):
 class ChatPath(BaseModel):
     chat_id: str
 
+
+class MessageSpeechPath(BaseModel):
+    chat_id: str
+    message_id: str
+
+
+class MessageSpeechLanguageQuery(BaseModel):
+    language: str | None = None
+
+
 class WorldPath(BaseModel):
     world_id: str
 

@@ -3,6 +3,7 @@ from flask_openapi3 import APIBlueprint
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app import services
+from app import tts_client
 from app import whisper_client
 from app.sockets import emit_user_message_created
 from app.chat_strategies import strategy_display_name
@@ -22,6 +23,8 @@ from app.api_models import (
     LocationsListResponse,
     LoginBody,
     MediaPath,
+    MessageSpeechLanguageQuery,
+    MessageSpeechPath,
     MessagesQuery,
     MessagesResponseBody,
     PersonaBody,
@@ -167,6 +170,73 @@ def transcribe_chat_audio(path: ChatPath, form: AudioTranscriptionForm):
 
     return TranscriptionResponse(text=trimmed).model_dump(), 200
 
+
+@bp.post("/chats/<string:chat_id>/messages/<string:message_id>/speech")
+@jwt_required()
+def synthesize_chat_message_speech(
+    path: MessageSpeechPath,
+    query: MessageSpeechLanguageQuery,
+):
+    current_user_id = get_jwt_identity()
+    chat = Chat.query.get(path.chat_id)
+    if not chat:
+        return ErrorData(error="Chat not found").model_dump(), 404
+    if not services.is_user_in_chat(current_user_id, path.chat_id):
+        return ErrorData(error="User is not in the specified chat").model_dump(), 403
+
+    message = Message.query.get(path.message_id)
+    if not message or message.chat_id != path.chat_id:
+        return ErrorData(error="Message not found").model_dump(), 404
+    if message.sender_type != MessageType.ASSISTANT:
+        return ErrorData(error="Only assistant messages can be synthesized").model_dump(), 400
+
+    cached = services.resolve_assistant_speech_file(message)
+    if cached:
+        abs_path, mime = cached
+        resp = send_file(abs_path, mimetype=mime)
+        resp.headers["X-Cached-Speech"] = "1"
+        return resp
+
+    lang_hint = (query.language or "").strip() or None
+    if not lang_hint:
+        lang_hint = getattr(chat, "language", None) or "en"
+    text = services.message_text_for_client(message)
+    try:
+        audio_bytes, mime_hint = tts_client.synthesize_speech(text, lang_hint)
+    except tts_client.TTSSynthesisError as exc:
+        return ErrorData(error=exc.message).model_dump(), exc.status_code
+
+    services.persist_assistant_speech(message, audio_bytes, mime_hint)
+    resolved = services.resolve_assistant_speech_file(message)
+    if not resolved:
+        return ErrorData(error="Failed to persist speech file").model_dump(), 500
+    abs_path, mime = resolved
+    return send_file(abs_path, mimetype=mime)
+
+
+@bp.get("/chats/<string:chat_id>/messages/<string:message_id>/speech")
+@jwt_required()
+def get_chat_message_speech(path: MessageSpeechPath):
+    current_user_id = get_jwt_identity()
+    chat = Chat.query.get(path.chat_id)
+    if not chat:
+        return ErrorData(error="Chat not found").model_dump(), 404
+    if not services.is_user_in_chat(current_user_id, path.chat_id):
+        return ErrorData(error="User is not in the specified chat").model_dump(), 403
+
+    message = Message.query.get(path.message_id)
+    if not message or message.chat_id != path.chat_id:
+        return ErrorData(error="Message not found").model_dump(), 404
+    if message.sender_type != MessageType.ASSISTANT:
+        return ErrorData(error="Only assistant messages have speech").model_dump(), 400
+
+    resolved = services.resolve_assistant_speech_file(message)
+    if not resolved:
+        return ErrorData(error="No speech for this message").model_dump(), 404
+    abs_path, mime = resolved
+    return send_file(abs_path, mimetype=mime)
+
+
 @bp.get("/chats/<string:chat_id>/messages")
 @jwt_required()
 def get_messages_in_chat(path: ChatPath, query: MessagesQuery):
@@ -197,6 +267,8 @@ def get_chat(path: ChatPath):
             "user_id": chat.user_id,
             "message": services.message_text_for_client(message),
             "assistant_meta": message.assistant_meta,
+            "sender_type": message.sender_type.name.lower(),
+            "has_speech": services.assistant_message_has_speech(message),
         }
         for message in messages
     ]

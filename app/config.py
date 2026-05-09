@@ -44,3 +44,11 @@ class Config:
             "audio/flac",
         }
     )
+
+    # XTTS v2 (tts_service HTTP). Empty URL yields 502 on speech routes only.
+    TTS_SYNTHESIS_URL = (
+        os.environ.get("TTS_SYNTHESIS_URL", "").strip()
+        or os.environ.get("XTTS_SYNTHESIS_URL", "").strip()
+    )
+    TTS_HTTP_TIMEOUT_SEC = float(os.environ.get("TTS_HTTP_TIMEOUT_SEC", "300"))
+    TTS_SYNTHESIS_API_KEY = os.environ.get("TTS_SYNTHESIS_API_KEY", "").strip() or None

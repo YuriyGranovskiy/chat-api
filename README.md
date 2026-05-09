@@ -62,4 +62,37 @@ Each chat has a **`language`** field (ISO 639-1 style, e.g. `en`, `ru`). It is u
 - **`GET /api/chats`** — each item includes **`language`**.
 - **`GET /api/chats/{id}`** — response includes **`language`**.
 
-Run `python3 scripts/migrate_local_db.py` on existing SQLite DBs to add `chat.language` (existing rows get `en`).
+Run `python3 scripts/migrate_local_db.py` on existing SQLite DBs to add **`chat.language`**, **`message.assistant_speech_path`**, and related columns (existing chat rows keep default `language`).
+
+## Speech synthesis (`tts_service`)
+
+Assistant messages can be synthesized with **Coqui XTTS v2** using a sidecar in [`tts_service/`](tts_service/), similar to Whisper.
+
+1. Provide a short **reference speaker** `.wav` and set **`XTTS_SPEAKER_WAV`** to its path (required for `/v1/speech`).
+
+2. Start the sidecar (heavy: torch + Coqui **TTS**; first request may download model weights):
+
+   ```bash
+   cd tts_service
+   export XTTS_SPEAKER_WAV=/path/to/ref.wav
+   ./start.sh
+   ```
+
+   Defaults bind **127.0.0.1:8091**. Optional: **`TTS_HOST`**, **`TTS_PORT`**, **`XTTS_USE_GPU=0`** for CPU-only, **`XTTS_MODEL`** for a different XTTS checkpoint id.
+
+3. Point the Flask app at the synthesizer URL (either variable works):
+
+   ```bash
+   export TTS_SYNTHESIS_URL=http://127.0.0.1:8091/v1/speech
+   # optional alias:
+   export XTTS_SYNTHESIS_URL=http://127.0.0.1:8091/v1/speech
+   ```
+
+4. API (same JWT as other chat routes):
+
+   - **`POST /api/chats/{chat_id}/messages/{message_id}/speech`** — run XTTS (or return cache) as **audio/wav**; **`X-Cached-Speech: 1`** when a stored file was reused. Optional **`language`** query overrides the chat default.
+   - **`GET`** the same URL — fetch stored speech, **404** if absent.
+
+Unset **`TTS_SYNTHESIS_URL`** → **`POST`** returns **502**.
+
+Message payloads from **`GET …/messages`**, **`GET /chats/{id}`**, and WebSocket **`new_message`** include **`has_speech`** (`true` when synthesis was stored for an assistant row).

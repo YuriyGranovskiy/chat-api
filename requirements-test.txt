@@ -1,0 +1,11 @@
+# Optional: deps to run unittest (minimal + message_job integrations)
+Flask>=2.0,<3
+Werkzeug>=2.0,<3
+Flask-SQLAlchemy<3
+SQLAlchemy>=1.4,<2
+Flask-Bcrypt
+httpx>=0.27
+pydantic>=2.4
+ollama
+transformers
+python-ulid>=3.0.0
